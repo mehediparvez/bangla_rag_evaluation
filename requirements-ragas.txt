@@ -1,0 +1,4 @@
+# Only needed for RQ2 (RAGAS scoring). Install after requirements.txt.
+# RAGAS changes its API often; bangla_rag/ragas_eval.py is written for 0.2.x.
+ragas>=0.2,<0.3
+langchain-google-genai

@@ -1,0 +1,16 @@
+# data and outputs are regenerated, and the dataset is not ours to redistribute
+data/
+cache/
+results*/
+human/
+.env
+*.npy
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.claude/
+
+# private working files
+Bangla RAG Evaluation.pdf
+research_notes/
+reports/
