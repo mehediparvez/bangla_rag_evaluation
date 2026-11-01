@@ -6,7 +6,7 @@ MSc project code. Two questions:
 - **RQ2** Do automatic RAGAS judge scores agree with human grades on Bangla answers?
 
 Data: [BanglaRQA](https://huggingface.co/datasets/sartajekram/BanglaRQA) (Ekram et al., EMNLP Findings 2022; CC BY-NC-SA 4.0), general-domain Bangla Wikipedia passages with questions. All 3,000 passages form the retrieval pool; questions come from a seeded sample of answerable *test* questions. The dataset is downloaded at run time and is not stored in this repository.
-Generator: Gemini 2.5 Flash-Lite, temperature 0, one fixed prompt for every run.
+Generator: Gemini 3.5 Flash-Lite (override with `--model`), temperature 0, one fixed prompt for every run.
 
 > Domain note: the original plan used medical biology (BanglaMedQA) with a textbook corpus. The textbook text was not obtainable in time, so this version uses BanglaRQA. State this as a limitation in the thesis.
 

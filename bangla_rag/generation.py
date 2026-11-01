@@ -19,7 +19,7 @@ class DailyQuotaExceeded(RuntimeError):
 class GeminiGenerator:
     def __init__(
         self,
-        model: str = "gemini-2.5-flash-lite",
+        model: str = "gemini-3.5-flash-lite",
         rpm: float = 10,
         cache_path: str | Path = "results/gemini_cache.jsonl",
         api_key: str | None = None,

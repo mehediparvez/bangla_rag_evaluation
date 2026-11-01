@@ -21,7 +21,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sheet", default="human/grading_sheet.csv")
     ap.add_argument("--tag", default="en", help="label for this configuration, used in the output file name")
-    ap.add_argument("--judge", default="gemini-2.5-flash-lite")
+    ap.add_argument("--judge", default="gemini-3.5-flash-lite")
     ap.add_argument("--embedding-model", default="models/gemini-embedding-001")
     ap.add_argument("--prompt-lang", default=None, help="adapt RAGAS prompts to this language, e.g. 'bengali'")
     ap.add_argument("--all-metrics", action="store_true", help="also compute context precision and recall")

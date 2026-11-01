@@ -127,7 +127,7 @@ def main(argv=None):
     ap.add_argument("--n", type=int, default=200, help="number of questions; 0 = all answerable test questions")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--split", default="Test")
-    ap.add_argument("--model", default="gemini-2.5-flash-lite")
+    ap.add_argument("--model", default="gemini-3.5-flash-lite")
     ap.add_argument("--rpm", type=float, default=10, help="max Gemini requests per minute (free tier is low)")
     ap.add_argument("--overlap", type=float, default=0.1, help="chunk overlap as a fraction of chunk size")
     ap.add_argument("--data-dir", default="data/banglarqa")
