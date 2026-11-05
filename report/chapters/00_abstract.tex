@@ -1,0 +1,9 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{\numberline{}Abstract}
+Retrieval-augmented generation (RAG) lets a language model answer from supplied documents instead of from memory alone. Most guidance on how to build and evaluate RAG systems comes from English. This project examines two questions for Bangla. First, how much does retrieval help a strong large language model answer Bangla questions, and does the retrieval method (keyword search, dense embedding search, or a hybrid of both) matter? Second, can the automatic RAGAS judge be trusted on Bangla answers, that is, do its scores agree with human grades?
+
+The experiments use the BanglaRQA reading-comprehension dataset. All 3,000 Wikipedia passages form the retrieval pool, which is split into 10,898 chunks of about 512 characters. A seeded sample of \todo{200} answerable test questions is answered by Gemini under four settings: no retrieval, BM25, dense retrieval with BGE-M3, and a hybrid of the two. Answers are scored by exact match and token-level F1, and the settings are compared with bootstrap confidence intervals and paired McNemar tests. For the second question, about \todo{100} answers are graded by hand and compared with RAGAS faithfulness and answer-relevancy scores using Spearman correlation.
+
+\todo{Fill in after the runs finish: one or two sentences with the main RQ1 result (for example, whether retrieval beat the no-retrieval baseline and by how much) and the main RQ2 result (the Spearman correlation with its confidence interval).}
+
+This is a scoped empirical pilot: one dataset, one generator model and a small question sample. The report documents these limits, and in particular that the planned medical-textbook corpus was replaced by a general-domain Wikipedia dataset.

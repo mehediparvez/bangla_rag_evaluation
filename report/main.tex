@@ -1,0 +1,137 @@
+% Compile with XeLaTeX (Overleaf: Menu -> Compiler -> XeLaTeX), then Biber for the bibliography.
+\documentclass[12pt]{report}
+
+% Font: TeX Gyre Termes is a Times New Roman clone that ships with TeX Live and Overleaf.
+% If you prefer the real Times New Roman on a local machine, change it to \setmainfont{Times New Roman}.
+\usepackage{fontspec}
+\setmainfont{TeX Gyre Termes}
+
+\usepackage{graphicx}
+\graphicspath{{figures/}{./}}
+\usepackage{float}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{textcomp}
+\usepackage[table]{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage{ragged2e}
+\usepackage{array,multirow}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{ref.bib}
+
+\usepackage[parfill]{parskip}
+\usepackage{geometry}
+\usepackage{sectsty}
+\chapterfont{\centering}
+
+\geometry{
+	paper=a4paper,
+	top=1in,
+	bottom=1in,
+	left=1.2in,
+	right=0.8in,
+	headheight=0.75cm,
+	footskip=1.5cm,
+	headsep=0.75cm,
+}
+\linespread{1.5}
+
+% ---------------------------------------------------------------------------
+% Visible reminder for anything still to be filled in. Search the project for TODO before submitting.
+\newcommand{\todo}[1]{\textbf{\textcolor{red}{[TODO: #1]}}}
+% ---------------------------------------------------------------------------
+
+\begin{document}
+
+% ============================ TITLE PAGE ============================
+\begin{titlepage}
+	\centering
+	\includegraphics[height=4cm,width=4cm]{unilogo.png}\par
+	\vspace{0.3cm}
+	{\huge\bfseries \todo{University name} \par}
+	\vspace{0.5cm}
+	{\scshape\Large\bfseries What Makes Bangla RAG Answers Trustworthy? An Empirical Study of Retrieval Choices and Automatic Evaluation\par}
+	\vspace{0.45cm}
+	{\scshape\Large\bfseries A RESEARCH PROJECT REPORT \par}
+	{\scshape\Large\bfseries \textit{Submitted By}\par}
+	{\Large\textbf{\todo{Your full name}}}\par
+	{\Large{ID: \todo{your ID}}}\par
+	\vspace{0.35cm}
+	{\large\textbf{\textit{In Partial Fulfillment of the Requirements for the Course \todo{course name} of}}}\par
+	{\Large\textbf{\todo{MASTER OF SCIENCE}\\}}
+	\vspace{0.1cm}
+	{\large\textbf{IN }}
+	{\large\textbf{\todo{DEPARTMENT NAME}\par}\par}
+	\vspace{0.45cm}
+	{\Large\textbf{\todo{UNIVERSITY NAME, CITY}}}\par
+	\vspace{0.35cm}
+	{\Large\bfseries \todo{Month Year}\par}
+\end{titlepage}
+
+% ============================ CERTIFICATE ============================
+\newpage
+\pagenumbering{gobble}
+\begin{center}
+	\large\textbf{BONAFIDE CERTIFICATE}\\
+\end{center}
+\section*{}
+This is to certify that this research project entitled
+\textbf{``What Makes Bangla RAG Answers Trustworthy? An Empirical Study of Retrieval Choices and Automatic Evaluation''}
+is submitted by \textbf{\todo{Your full name}}, who carried out the project work under my supervision. This is the bonafide work.
+\\
+\\
+
+\begin{table}[h]
+	\begin{tabular}{l@{\hspace{3cm}}l}
+		{Signature} & {Signature} \\
+		\\
+		\ldots\ldots\ldots\ldots\ldots\ldots\ldots\ldots & \ldots\ldots\ldots\ldots\ldots\ldots\ldots\ldots \\
+		\todo{Name} & \todo{Name} \\
+		\textbf{Chairman of the Exam Committee} & \textbf{Supervisor} \\
+		\todo{Designation} & \todo{Designation} \\
+		\todo{Department} & \todo{Department} \\
+		\todo{University, City.} & \todo{University, City.} \\
+	\end{tabular}
+\end{table}
+
+\pagenumbering{Roman}
+
+% ============================ ABSTRACT ============================
+\input{chapters/00_abstract}
+
+% ============================ ACKNOWLEDGEMENT ============================
+\chapter*{Acknowledgement}
+\addcontentsline{toc}{chapter}{\numberline{}Acknowledgements}
+First and foremost, I thank the Almighty Allah for the health and determination that allowed me to complete this project.
+
+\noindent I extend my sincere gratitude to my supervisor, \textbf{\todo{Supervisor name}}, for the guidance, feedback and encouragement that shaped this work.
+
+\noindent I thank the creators of the BanglaRQA dataset for making it publicly available, and the maintainers of the open-source libraries used in this project.
+
+\noindent Finally, I thank my family and friends for their constant support.
+
+% ============================ CONTENTS ============================
+\newpage
+\renewcommand*\contentsname{Table of Contents}
+\tableofcontents
+\listoffigures
+\listoftables
+\pagenumbering{arabic}
+
+\justifying
+
+% ============================ CHAPTERS ============================
+\input{chapters/01_introduction}
+\input{chapters/02_literature_review}
+\input{chapters/03_methodology}
+\input{chapters/04_results}
+\input{chapters/05_conclusion}
+
+% ============================ REFERENCES ============================
+\clearpage
+\addcontentsline{toc}{chapter}{\numberline{}References}
+\printbibliography[title={References}]
+
+\end{document}

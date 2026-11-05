@@ -14,3 +14,19 @@ __pycache__/
 Bangla RAG Evaluation.pdf
 research_notes/
 reports/
+
+# LaTeX build artifacts (sources in report/ are tracked)
+report/*.aux
+report/*.log
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.out
+report/*.bbl
+report/*.blg
+report/*.bcf
+report/*.run.xml
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/main.pdf

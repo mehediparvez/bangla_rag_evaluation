@@ -1,0 +1,60 @@
+\chapter{Methodology}
+
+This chapter describes the data, the RAG pipeline, the metrics and the statistical analysis. All code is in the project repository (\texttt{bangla\_rag/}); each run is repeatable from a fixed random seed.
+
+\section{Research Design}
+
+Every question is answered under four settings that differ only in retrieval: no retrieval (\texttt{none}), BM25 (\texttt{bm25}), dense retrieval with BGE-M3 (\texttt{dense}), and a hybrid of the two (\texttt{hybrid}). The generator model, prompt format, number of retrieved chunks, chunk size and question set are the same in all four. The comparison therefore isolates the effect of the retrieval method. Figure~\ref{fig:pipeline} shows the flow.
+
+\begin{figure}[H]
+	\centering
+	\fbox{\parbox{0.92\textwidth}{\centering\small
+		Question $\rightarrow$ [retriever: none / BM25 / dense / hybrid] $\rightarrow$ top-3 chunks $\rightarrow$ Bangla prompt $\rightarrow$ Gemini $\rightarrow$ JSON answer $\rightarrow$ metrics
+	}}
+	\caption{The experimental pipeline. \todo{Replace this placeholder with a proper diagram, for example the pipeline figure from the defence map.}}
+	\label{fig:pipeline}
+\end{figure}
+
+\section{Data}
+\label{sec:domain}
+
+\textbf{Dataset.} The study uses BanglaRQA \cite{ekram2022banglarqa}, a Bangla reading-comprehension dataset of Wikipedia passages with questions and reference answers. It is released under CC BY-NC-SA 4.0, so it is downloaded at run time rather than redistributed with the code.
+
+\textbf{Retrieval corpus.} All 3,000 passages from the training, validation and test splits form the retrieval pool, so retrieval must find the relevant passage among many distractors.
+
+\textbf{Questions.} Questions are drawn from the test split, keeping only answerable questions (1,124 of 1,493), and a seeded random sample of \todo{200} is used (seed 13).
+
+\textbf{Change of domain.} The original proposal planned a medical-biology corpus built from a Class 12 textbook. The textbook text could not be obtained within the project time, so this version uses general-domain BanglaRQA. Results therefore describe Wikipedia-style questions and should not be assumed to carry over to medical text. This is listed as a limitation in Chapter~5.
+
+\section{Chunking}
+
+Passages are split into windows of 512 characters with 10\% overlap. Window ends snap to whitespace or a sentence mark when one occurs in the last 30\% of the window, to avoid cutting words. This gives 10,898 chunks. Each chunk keeps the identifier of its source passage so retrieval can be checked against the gold passage.
+
+\section{Retrievers}
+
+\begin{itemize}
+	\item \textbf{BM25.} Okapi BM25 over whitespace tokens after normalisation (Unicode NFC, Bangla digits mapped to ASCII, punctuation removed).
+	\item \textbf{Dense.} BAAI/bge-m3 embeddings, cosine similarity, searched with a FAISS inner-product index.
+	\item \textbf{Hybrid.} Reciprocal rank fusion ($k=60$) of the top 50 results of BM25 and dense retrieval.
+\end{itemize}
+All retrieval settings return the top 3 chunks.
+
+\section{Generation}
+
+The generator is Google's Gemini \todo{confirm the exact model identifier used in the final run, e.g.\ gemini-3.5-flash-lite} at temperature 0 and a 512-token output limit, accessed through the free API tier. One fixed Bangla prompt is used: with retrieval, the model is told to answer using only the given passages and to reply ``no answer in the passages'' if they do not contain it; without retrieval it answers from its own knowledge. The model returns JSON with an answer and a short explanation. Every call is cached on disk, so a run can be resumed and repeated without new calls.
+
+\section{Metrics}
+
+\textbf{Answer accuracy.} Exact match (EM) and token-level F1 against the reference answers (the maximum over references). Text is normalised before comparison, and an answer counts as \emph{correct} when F1 $\ge 0.5$; this binary outcome is used for the significance tests.
+
+\textbf{Retrieval quality.} \emph{Passage hit@k}: at least one retrieved chunk comes from the gold passage. \emph{Answer in context}: a reference answer appears as text in the retrieved chunks. The second metric shows an upper bound on what the generator can use.
+
+\section{Statistical Analysis}
+
+Means are reported with 95\% bootstrap confidence intervals over questions. Settings are compared on the same questions with the exact McNemar test on the binary correct outcome, with Holm correction for multiple comparisons. For RQ2, agreement is measured with Spearman's rank correlation and a bootstrap confidence interval, and with quadratic-weighted Cohen's $\kappa$ if a second human rater grades a subset.
+
+\section{RQ2: Human Grading and RAGAS}
+
+\textbf{Human grading.} About \todo{100} answers from the retrieval settings (excluding the no-retrieval run) are shuffled and graded by hand using a written rubric, without seeing RAGAS scores. \todo{Insert the rubric scale and state who graded, and whether a second grader labelled a subset.}
+
+\textbf{RAGAS.} RAGAS (version 0.2.x) computes faithfulness and answer relevancy for the same answers, using Gemini as the judge model. The judge prompts are run in English, and in an experimental Bangla-adapted version, to test whether prompt language matters. Because the judge and the generator are both Gemini models, the judge may favour the generator's style; this is acknowledged as a limitation.

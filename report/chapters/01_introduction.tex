@@ -1,0 +1,42 @@
+\chapter{Introduction}
+
+\section{Contextual Background}
+
+Large language models (LLMs) now answer questions fluently in many languages, including Bangla. They still have three weaknesses that matter in practice. They do not know documents they were never trained on, such as a university's textbooks or a hospital's guidelines. They sometimes state wrong answers with confidence. And they cannot show where an answer came from. Retrieval-augmented generation (RAG) addresses these problems: the system first searches a document collection, then gives the best passages to the model and asks it to answer from them.
+
+Most evidence on how to build RAG systems comes from English. Bangla differs from English in ways that can change which design choices work. Words take many inflected forms, which affects keyword matching. Embedding models trained mostly on English text may represent Bangla less well. Published work comparing retrieval choices for Bangla RAG is sparse (Chapter~2).
+
+A second problem is evaluation. Grading thousands of answers by hand is slow, so researchers use automatic judges. RAGAS is a widely used open-source framework that asks an LLM to judge whether an answer is supported by the retrieved passages and whether it addresses the question \cite{es2023ragas}. It was validated against human annotation on a small English set. Whether its scores agree with human judgement on Bangla answers is not established.
+
+\section{Motivation}
+
+Even strong frontier models benefit from retrieval when the answer lies in documents they have not seen, and RAG remains the standard way to ground answers in a specific source. Teams building Bangla question-answering systems must still choose a retrieval method, and they need a way to measure answer quality without grading every answer manually. This project provides a controlled comparison of three retrieval methods against a no-retrieval baseline, and a first check of how far RAGAS can be trusted on Bangla.
+
+A no-retrieval baseline is essential here. If the generator already answers most questions correctly without any retrieved text, retrieval adds little on that kind of question, and that is itself a finding.
+
+\section{Research Questions and Objectives}
+
+\begin{description}[leftmargin=0cm,labelindent=0cm]
+	\item[RQ1] How does retrieval method (none, BM25, dense, hybrid) affect the accuracy of Gemini's Bangla answers, and which setting performs best?
+	\item[RQ2] Do automatic RAGAS scores (faithfulness and answer relevancy) agree with human grades of the same Bangla answers?
+\end{description}
+
+The objectives are to:
+\begin{enumerate}
+	\item build a reproducible pipeline that runs every setting on the same questions with one fixed prompt and generator;
+	\item measure answer accuracy and retrieval quality for each setting, with confidence intervals and paired significance tests;
+	\item collect human grades for a sample of answers and measure their agreement with RAGAS;
+	\item state clearly what the results do and do not show.
+\end{enumerate}
+
+\section{Scope and Contributions}
+
+This is a scoped empirical pilot, not a new method. The contributions are a documented and reproducible comparison of retrieval settings on a Bangla QA dataset, and, as far as the literature search for this project could determine, a first comparison of RAGAS scores with human grades on Bangla RAG answers. The code is released with the report. \todo{Re-check the novelty wording against a Google Scholar and Semantic Scholar search before submission.}
+
+\section{Report Organization}
+
+\textbf{Chapter 1: Introduction} gives the background, research questions and scope.
+\textbf{Chapter 2: Literature Review} covers retrieval methods, Bangla RAG work and LLM-based evaluation.
+\textbf{Chapter 3: Methodology} describes the data, pipeline, metrics and statistics.
+\textbf{Chapter 4: Results} reports the experiments.
+\textbf{Chapter 5: Conclusion} summarises findings, limitations and future work.

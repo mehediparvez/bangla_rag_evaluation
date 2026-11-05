@@ -1,0 +1,36 @@
+\chapter{Literature Review}
+
+This chapter reviews three areas: retrieval methods used in RAG, existing Bangla RAG and question-answering work, and the validation of LLM-based evaluators, including RAGAS. It ends with the gap this project addresses.
+
+\section{Retrieval Methods for RAG}
+
+\textbf{Keyword retrieval.} BM25 ranks passages by how often the query terms appear in them, adjusted for passage length and term rarity \cite{robertson2009bm25}. It needs no training and is a strong baseline, but it depends on how text is split into words. This matters for Bangla, where inflection and the way characters combine can split or merge tokens. This project tokenises on whitespace after removing punctuation, rather than on regular-expression word characters, which would split Bangla words at vowel signs.
+
+\textbf{Dense retrieval.} Dense retrievers map the query and each passage to vectors and rank by similarity. BGE-M3 is a multilingual embedding model that supports long inputs and more than 100 languages \cite{chen2024bgem3}. Multilingual E5 is a comparable model family \cite{wang2024me5}. Sentence encoders tuned for similarity rather than retrieval, such as Bengali SBERT, may behave differently on retrieval tasks. The reviewed sources did not include a Bangla-specific comparison of these models, although indirect evidence from multilingual retrieval benchmarks suggests BGE-M3 and multilingual E5 are broadly comparable.
+
+\textbf{Hybrid retrieval.} Hybrid methods combine the keyword and dense rankings. Reciprocal rank fusion (RRF) merges ranked lists by summing $1/(k+\text{rank})$ over the lists and needs no score calibration \cite{cormack2009rrf}. This project uses RRF with $k=60$.
+
+\section{Bangla RAG and Question Answering}
+
+\textbf{BanglaRQA.} BanglaRQA is a Bangla reading-comprehension dataset built on Wikipedia passages with several question and answer types \cite{ekram2022banglarqa}. It is used here as both the question source and the retrieval corpus.
+
+\textbf{BanglaMedQA.} Work from the Islamic University of Technology benchmarks RAG strategies on Bangla medical multiple-choice questions, using a Class 12 biology textbook as the corpus, a Bengali sentence-embedding retriever and fixed chunking \cite{sultana2025banglamedqa}. It varies the RAG strategy (traditional, agentic, iterative and others) rather than the retrieval components. It also reports that strong generators already score highly without retrieval, which limits how much retrieval can add. The original plan for this project used the same textbook, but the text could not be obtained in time (Section~\ref{sec:domain}).
+
+\textbf{Other Bangla RAG systems.} Several 2025--2026 preprints describe application-specific Bangla RAG systems, for example in legal, agricultural, diabetes-guideline and knowledge-base QA settings. At least two combine BM25 with BGE-M3 \cite{aich2026hybridragbn}. In the sources found, these report end-to-end results for one pipeline rather than a controlled comparison of retrieval components. \todo{Verify each of these preprints directly before citing more than this one, and run a Google Scholar / Semantic Scholar search for ``Bangla RAG'' ablations.}
+
+\section{Evaluating Answers with LLM Judges}
+
+\textbf{RAGAS.} The RAGAS framework defines reference-free metrics, including faithfulness (are the answer's claims supported by the retrieved context?) and answer relevancy (does the answer address the question?) \cite{es2023ragas}. In its original paper, agreement with human annotation was measured on a small English set; faithfulness agreed most (0.95), and answer relevance less (0.78).
+
+\textbf{Multilingual validation.} MEMERAG meta-evaluates LLM judges for RAG on five languages (English, German, Spanish, French, Hindi) with expert annotation, and reports only moderate balanced accuracy on faithfulness; Bengali is not covered and all prompts were in English \cite{blandon2025memerag}. The closest direct precedent is work adapting RAGAS to Romanian and validating it against native-speaker annotation \cite{creanga2026romanian}. Beyond RAG, the Pariksha study compared human and LLM evaluators on ten Indic languages including Bengali, and found lower human--LLM agreement on direct assessment for Bengali than the cross-language average (Kendall's $\tau$ of 0.43 against 0.65) \cite{watts2024pariksha}.
+
+\textbf{Limits of the evidence.} Evidence on RAGAS stability comes mostly from practitioner material rather than peer-reviewed studies. No guidance on the human sample size needed to validate a judge was found; the sample size here follows practical constraints and the confidence intervals reported in Chapter~4 show its precision.
+
+\section{Research Gap}
+
+Together, the reviewed work leaves two gaps that this project addresses on a small scale:
+\begin{enumerate}
+	\item no controlled comparison of no-retrieval, keyword, dense and hybrid retrieval with one fixed generator and prompt on a Bangla QA dataset was found;
+	\item no validation of RAGAS faithfulness and answer-relevancy scores against human grades on Bangla RAG answers was found.
+\end{enumerate}
+Both statements rest on a web-based search and should be read as ``to the best of our knowledge''.

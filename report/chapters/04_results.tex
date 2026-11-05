@@ -1,0 +1,35 @@
+\chapter{Results}
+
+\todo{All numbers in this chapter must come from the finished runs. Run \texttt{python report/make\_tables.py} after \texttt{python -m bangla\_rag.analyze} to regenerate the tables below, then write the interpretation in your own words.}
+
+\section{Retrieval Quality}
+
+In an early check with BM25, 512-character chunks and the top 3 chunks on 100 questions, the correct passage was among the retrieved chunks for 99 of 100 questions, but a reference answer appeared in the retrieved text for only 77 of 100. \todo{Replace with the final figures for all retrieval settings on the full question sample.} The gap between the two numbers suggests that chunking, not passage finding, may limit answer quality.
+
+\section{RQ1: Effect of Retrieval Method on Answer Accuracy}
+
+Table~\ref{tab:rq1-metrics} shows the metrics for each setting, and Table~\ref{tab:rq1-mcnemar} shows paired tests against the no-retrieval baseline.
+
+\begin{table}[H]
+	\centering
+	\caption{Answer metrics per setting (mean and 95\% bootstrap CI).}
+	\label{tab:rq1-metrics}
+	\IfFileExists{tables/rq1_metrics.tex}{\input{tables/rq1_metrics.tex}}{\todo{run make\_tables.py to create tables/rq1\_metrics.tex}}
+\end{table}
+
+\begin{table}[H]
+	\centering
+	\caption{Paired McNemar tests against the no-retrieval baseline (correct means F1 $\ge$ 0.5; Holm-adjusted).}
+	\label{tab:rq1-mcnemar}
+	\IfFileExists{tables/rq1_mcnemar.tex}{\input{tables/rq1_mcnemar.tex}}{\todo{run make\_tables.py to create tables/rq1\_mcnemar.tex}}
+\end{table}
+
+\todo{Interpretation: does retrieval beat the baseline? Which retriever is best? Are the differences statistically distinguishable given the confidence intervals? Report honestly if they are not.}
+
+\section{RQ2: RAGAS Compared with Human Grades}
+
+\todo{Insert the Spearman $\rho$ with confidence interval for faithfulness and for answer relevancy, the difference between English and Bangla judge prompts, and Cohen's $\kappa$ if a second rater was used. Source: output of \texttt{python -m bangla\_rag.human analyze}.}
+
+\section{Discussion}
+
+\todo{Short discussion tying RQ1 and RQ2 together: what a practitioner building a Bangla RAG system should take from this, and where the results are too uncertain to say.}

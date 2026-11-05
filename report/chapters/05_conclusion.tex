@@ -1,0 +1,26 @@
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+\todo{Write after the results are final. State the answer to RQ1 and RQ2 in two or three sentences each, with the key numbers and their confidence intervals.}
+
+\section{Limitations}
+
+\begin{itemize}
+	\item \textbf{Domain change.} The planned medical-textbook corpus was replaced by general-domain Bangla Wikipedia (BanglaRQA), so results may not carry over to medical text.
+	\item \textbf{Possible training exposure.} The generator may have seen Wikipedia text during training; the no-retrieval baseline measures this, but cannot remove it.
+	\item \textbf{One dataset and one generator.} Findings describe this dataset and this model family, not Bangla RAG in general.
+	\item \textbf{Sample size.} With a few hundred questions, and about 100 human-graded answers, confidence intervals are wide, so small differences between settings cannot be resolved.
+	\item \textbf{One factor at a time.} Retrieval method was varied with chunk size and number of chunks held fixed, so interactions between them are not measured.
+	\item \textbf{Judge and generator from the same family.} Gemini both generates and judges, which may bias the RAGAS scores toward the generator.
+	\item \textbf{Literature search.} The search was web-based; ``no prior study found'' statements should be checked against Google Scholar and Semantic Scholar.
+\end{itemize}
+
+\section{Future Research Directions}
+
+\begin{itemize}
+	\item Repeat the study on the original medical-textbook corpus if the text becomes available.
+	\item Vary chunk size, number of retrieved chunks and the embedding model, including a Bengali sentence encoder and multilingual E5.
+	\item Add a second, independent judge model, and a second human grader to measure human--human agreement.
+	\item Test open-weight generators, to see whether the findings hold outside one commercial model family.
+\end{itemize}
