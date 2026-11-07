@@ -35,7 +35,8 @@ def _is_hard(r) -> bool:
     return (not bool(r.get("answer_in_context", True))) or float(r.get("f1", 1.0)) < 0.5
 
 
-def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0.0) -> pd.DataFrame:
+def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0.0,
+               closed_book=0, ctx_run="bm25_c512_k3") -> pd.DataFrame:
     """Sample ``n`` rows. ``hard_frac`` of them come from likely-bad answers (see ``_is_hard``).
 
     With ``extend`` (a previously graded sheet) its rows are kept unchanged, the new rows exclude
@@ -48,9 +49,11 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
     old = pd.read_csv(extend, encoding="utf-8-sig") if extend else None
     taken = set(zip(old["run_id"], old["question_id"])) if old is not None else set()
     rng = random.Random(seed)
-    per_run = max(1, n // len(run_ids))
+    per_run = n // len(run_ids) if n > 0 else 0
     rows = []
     for run_id in run_ids:
+        if per_run == 0:
+            break
         df = runs[run_id]
         pool = [i for i in range(len(df)) if (run_id, df.iloc[i]["question_id"]) not in taken]
         hard = [i for i in pool if _is_hard(df.iloc[i])]
@@ -65,6 +68,25 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
             rows.append({
                 "run_id": run_id, "question_id": r["question_id"], "question": r["question"],
                 "contexts": "\n---\n".join(r["contexts"]), "reference": " | ".join(r["references"]),
+                "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
+            })
+    if closed_book > 0:
+        # Closed-book answers (no retrieval, so from the model's memory) shown with the passages that
+        # retrieval found for the same question: many are unsupported, which gives real unfaithful cases.
+        if "none" not in runs or ctx_run not in runs:
+            raise SystemExit(f"--closed-book needs finished runs 'none' and '{ctx_run}'")
+        ctx = {r["question_id"]: r for _, r in runs[ctx_run].iterrows()}
+        label = f"none+ctx:{ctx_run}"
+        pool = [i for i in range(len(runs["none"]))
+                if runs["none"].iloc[i]["question_id"] in ctx and (label, runs["none"].iloc[i]["question_id"]) not in taken]
+        picks = rng.sample(pool, min(closed_book, len(pool)))
+        print(f"{label}: {len(picks)} closed-book rows from {len(pool)} available")
+        for i in picks:
+            r = runs["none"].iloc[i]
+            c = ctx[r["question_id"]]
+            rows.append({
+                "run_id": label, "question_id": r["question_id"], "question": r["question"],
+                "contexts": "\n---\n".join(c["contexts"]), "reference": " | ".join(r["references"]),
                 "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
             })
     rng.shuffle(rows)  # hide the run order and the hard/easy split from the rater
@@ -139,6 +161,9 @@ def main(argv=None):
     s.add_argument("--out", default="human/grading_sheet.csv")
     s.add_argument("--hard-frac", type=float, default=0.0,
                    help="fraction of rows drawn from likely-bad answers (answer not in context, or F1 < 0.5)")
+    s.add_argument("--closed-book", type=int, default=0,
+                   help="add N no-retrieval answers shown with the retrieved passages (naturally unsupported cases)")
+    s.add_argument("--ctx-run", default="bm25_c512_k3", help="run whose passages are shown for closed-book rows")
     s.add_argument("--extend", help="graded sheet to keep; adds --n NEW rows after it (write to a different --out)")
     a = sub.add_parser("analyze", help="compare RAGAS scores with human grades")
     a.add_argument("--sheet", default="human/grading_sheet.csv")
@@ -147,7 +172,8 @@ def main(argv=None):
     a.add_argument("--second-rater", help="second rater's filled copy of the sheet")
     args = ap.parse_args(argv)
     if args.cmd == "sample":
-        make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out, args.extend, args.hard_frac)
+        make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out, args.extend, args.hard_frac,
+                   args.closed_book, args.ctx_run)
     else:
         tags = {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}
         analyze(args.sheet, tags, args.second_rater)
