@@ -30,31 +30,55 @@ SHEET_COLS = ["row_id", "run_id", "question_id", "question", "contexts", "refere
               "human_faithful", "human_relevant", "notes"]
 
 
-def make_sheet(results_dir, run_ids, n, seed, out_path) -> pd.DataFrame:
+def _is_hard(r) -> bool:
+    """Answers likely to be unfaithful or wrong: gold answer missing from the context, or low F1."""
+    return (not bool(r.get("answer_in_context", True))) or float(r.get("f1", 1.0)) < 0.5
+
+
+def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0.0) -> pd.DataFrame:
+    """Sample ``n`` rows. ``hard_frac`` of them come from likely-bad answers (see ``_is_hard``).
+
+    With ``extend`` (a previously graded sheet) its rows are kept unchanged, the new rows exclude
+    the (run_id, question_id) pairs already in it and get row_ids that continue after its maximum.
+    """
     runs = load_runs(results_dir)
     run_ids = [r for r in run_ids if r in runs and r != "none" and "answer" in runs[r]]
     if not run_ids:
         raise SystemExit("no usable runs (need generation results from a retrieval run)")
+    old = pd.read_csv(extend, encoding="utf-8-sig") if extend else None
+    taken = set(zip(old["run_id"], old["question_id"])) if old is not None else set()
     rng = random.Random(seed)
     per_run = max(1, n // len(run_ids))
     rows = []
     for run_id in run_ids:
         df = runs[run_id]
-        for i in rng.sample(range(len(df)), min(per_run, len(df))):
+        pool = [i for i in range(len(df)) if (run_id, df.iloc[i]["question_id"]) not in taken]
+        hard = [i for i in pool if _is_hard(df.iloc[i])]
+        easy = [i for i in pool if i not in set(hard)]
+        n_hard = min(len(hard), round(per_run * hard_frac))
+        pick = rng.sample(hard, n_hard)
+        rest = [i for i in pool if i not in set(pick)]
+        pick += rng.sample(rest, min(per_run - n_hard, len(rest)))
+        print(f"{run_id}: {len(pick)} rows ({n_hard} from {len(hard)} hard candidates, {len(easy)} easy)")
+        for i in pick:
             r = df.iloc[i]
             rows.append({
                 "run_id": run_id, "question_id": r["question_id"], "question": r["question"],
                 "contexts": "\n---\n".join(r["contexts"]), "reference": " | ".join(r["references"]),
                 "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
             })
-    rng.shuffle(rows)  # hide the run order from the rater
+    rng.shuffle(rows)  # hide the run order and the hard/easy split from the rater
     sheet = pd.DataFrame(rows)
-    sheet.insert(0, "row_id", range(1, len(sheet) + 1))
+    first = int(old["row_id"].max()) + 1 if old is not None else 1
+    sheet.insert(0, "row_id", range(first, first + len(sheet)))
+    if old is not None:
+        sheet = pd.concat([old, sheet], ignore_index=True)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     sheet[SHEET_COLS].to_csv(out_path, index=False, encoding="utf-8-sig")
     (out_path.parent / "RUBRIC.txt").write_text(RUBRIC, encoding="utf-8")
-    print(f"wrote {len(sheet)} rows to {out_path}\n\n{RUBRIC}")
+    new = len(sheet) - (len(old) if old is not None else 0)
+    print(f"wrote {len(sheet)} rows to {out_path} ({new} new, ungraded)\n\n{RUBRIC}")
     return sheet
 
 
@@ -113,6 +137,9 @@ def main(argv=None):
     s.add_argument("--n", type=int, default=100)
     s.add_argument("--seed", type=int, default=7)
     s.add_argument("--out", default="human/grading_sheet.csv")
+    s.add_argument("--hard-frac", type=float, default=0.0,
+                   help="fraction of rows drawn from likely-bad answers (answer not in context, or F1 < 0.5)")
+    s.add_argument("--extend", help="graded sheet to keep; adds --n NEW rows after it (write to a different --out)")
     a = sub.add_parser("analyze", help="compare RAGAS scores with human grades")
     a.add_argument("--sheet", default="human/grading_sheet.csv")
     a.add_argument("--ragas", action="append", required=True,
@@ -120,7 +147,7 @@ def main(argv=None):
     a.add_argument("--second-rater", help="second rater's filled copy of the sheet")
     args = ap.parse_args(argv)
     if args.cmd == "sample":
-        make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out)
+        make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out, args.extend, args.hard_frac)
     else:
         tags = {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}
         analyze(args.sheet, tags, args.second_rater)
