@@ -1,4 +1,10 @@
 # Only needed for RQ2 (RAGAS scoring). Install after requirements.txt.
 # RAGAS changes its API often; bangla_rag/ragas_eval.py is written for 0.2.x.
+# ragas 0.2.x imports langchain_community.chat_models.vertexai, which newer
+# LangChain (1.x / langchain-community 0.4) removed, so the LangChain stack is pinned.
 ragas>=0.2,<0.3
-langchain-google-genai
+langchain-community<0.4
+langchain<1
+langchain-core<1
+langchain-openai<1
+langchain-google-genai<3
