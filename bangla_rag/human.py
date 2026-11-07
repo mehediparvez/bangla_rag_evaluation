@@ -65,7 +65,15 @@ def _ci(x, y):
 
 def analyze(sheet_path, ragas_paths: dict[str, str], second_rater=None):
     sheet = pd.read_csv(sheet_path, encoding="utf-8-sig")
-    sheet = sheet.dropna(subset=["human_faithful", "human_relevant"])
+    graded = sheet.dropna(subset=["human_faithful", "human_relevant"]).copy()
+    for col in ["human_faithful", "human_relevant"]:
+        num = pd.to_numeric(graded[col], errors="coerce")
+        bad = graded[num.isna() | ~num.isin([1, 2, 3])]
+        if len(bad):
+            print(f"WARNING: {len(bad)} row(s) with an invalid {col} (must be 1, 2 or 3) are skipped. "
+                  f"row_id / value: {list(zip(bad['row_id'], bad[col]))}")
+        graded[col] = num.where(num.isin([1, 2, 3]))
+    sheet = graded.dropna(subset=["human_faithful", "human_relevant"])
     print(f"human-graded rows: {len(sheet)}\n")
     lines = []
     for tag, path in ragas_paths.items():
