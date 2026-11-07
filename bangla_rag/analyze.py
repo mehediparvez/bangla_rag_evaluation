@@ -16,7 +16,7 @@ def load_runs(results_dir: str | Path) -> dict[str, pd.DataFrame]:
     """Load run files; a full run is preferred over a retrieval-only file for the same run id."""
     runs: dict[str, pd.DataFrame] = {}
     files = sorted(Path(results_dir).glob("*.jsonl"))
-    for path in sorted(files, key=lambda p: p.name.endswith(".retrieval.jsonl"), reverse=True):
+    for path in sorted(files, key=lambda p: p.name.endswith(".retrieval.jsonl")):
         if path.name == "gemini_cache.jsonl":
             continue
         run_id = path.name.removesuffix(".retrieval.jsonl").removesuffix(".jsonl")
