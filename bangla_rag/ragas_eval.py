@@ -30,6 +30,8 @@ def main(argv=None):
     ap.add_argument("--chunk", type=int, default=10, help="rows scored per batch; progress is saved after each batch")
     ap.add_argument("--strictness", type=int, default=3,
                     help="ResponseRelevancy questions generated per answer (RAGAS default 3; 1 uses ~40%% fewer calls)")
+    ap.add_argument("--reverse", action="store_true",
+                    help="score the last rows first (the newest, unsupported-rich rows), so a quota stop still leaves a useful subset")
     ap.add_argument("--out-dir", default="human")
     args = ap.parse_args(argv)
 
@@ -76,6 +78,8 @@ def main(argv=None):
         done = pd.read_csv(path, encoding="utf-8-sig")
     scored_ids = set(done.loc[done.get("faithfulness").notna(), "row_id"]) if "faithfulness" in done else set()
     pending = [i for i in range(len(samples)) if int(sheet["row_id"].iloc[i]) not in scored_ids]
+    if args.reverse:
+        pending.reverse()
     print(f"{len(scored_ids)} rows already scored, {len(pending)} to do (saving every {args.chunk} rows)")
 
     for c0 in range(0, len(pending), args.chunk):
