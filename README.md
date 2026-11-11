@@ -15,7 +15,7 @@ Generator: Gemini 3.5 Flash-Lite (override with `--model`), temperature 0, one f
 ```bash
 pip install -r requirements.txt
 export GEMINI_API_KEY=...            # Colab: use Secrets, see notebooks/colab.ipynb
-python -m pytest -q                  # 11 unit tests, no key needed
+python -m pytest -q                  # 19 unit tests, no key needed
 python -m bangla_rag.data            # download BanglaRQA
 
 # 1. retrieval metrics only: free, no key, uses the GPU for dense models
@@ -33,28 +33,31 @@ The Gemini free tier has daily request limits. If it is hit, the script saves pr
 
 ## RQ2
 
+RAGAS faithfulness and answer relevance are compared with reference grades on the same answers. Faithful answers dominate in a
+random sample (almost all grades are 3), so a plain correlation has no variance to work with. The design therefore adds
+known-unsupported answers and reports *detection* (AUC, false-alarm rate) next to Spearman rho:
+
+| Row type | How it is made | Flag |
+|---|---|---|
+| random | answers from retrieval runs | `--n` |
+| hard | gold answer not in context, or F1 < 0.5 | `--hard-frac` |
+| closed-book | no-retrieval answer shown with retrieved passages | `--closed-book N` |
+| synthetic | answer paired with another question's passages (ids in `human/perturb_key.csv`) | `--perturb N` |
+
 ```bash
-python -m bangla_rag.human sample --runs bm25_c512_k3,hybrid-bge-m3_c512_k3 --n 100
-#   grade human/grading_sheet.csv by hand (rubric in human/RUBRIC.txt), without looking at RAGAS scores
+python -m bangla_rag.human sample --runs bm25_c512_k3 --n 0 --closed-book 60 --perturb 30        --extend human/grading_sheet_v2.csv --out human/grading_sheet_v3.csv
+#   grade the new rows by hand (rubric: human/RUBRIC.txt), without looking at RAGAS scores
 pip install -r requirements-ragas.txt
-python -m bangla_rag.ragas_eval --tag en                          # judge prompts in English
-python -m bangla_rag.ragas_eval --tag bn --prompt-lang bengali    # experimental prompt adaptation
-python -m bangla_rag.human analyze --ragas human/ragas_en.csv --ragas human/ragas_bn.csv
+python -m bangla_rag.ragas_eval --sheet human/grading_sheet_v3.csv --tag en                         # English judge prompts
+python -m bangla_rag.ragas_eval --sheet human/grading_sheet_v3.csv --tag bn --prompt-lang bengali   # Bengali prompts
+python -m bangla_rag.human detect  --sheet human/grading_sheet_v3.csv --ragas human/ragas_en.csv --ragas human/ragas_bn.csv
+python -m bangla_rag.human analyze --sheet human/grading_sheet_v3.csv --ragas human/ragas_en.csv --ragas human/ragas_bn.csv
 ```
 
-Reports Spearman rho with bootstrap CIs, the prompt-language difference, and quadratic-weighted kappa if a second rater fills a copy of the sheet.
-
-## Layout
-
-| Path | Purpose |
-|---|---|
-| `bangla_rag/text.py` | Bangla normalisation and tokenisation (does not split at vowel signs) |
-| `bangla_rag/data.py`, `chunking.py` | dataset download/sampling, character chunking |
-| `bangla_rag/retrieval.py` | BM25, dense (sentence-transformers + FAISS), hybrid (reciprocal rank fusion) |
-| `bangla_rag/prompts.py`, `generation.py` | fixed Bangla prompt, cached rate-limited Gemini client |
-| `bangla_rag/run.py`, `analyze.py` | RQ1 experiments, CIs and McNemar tests (Holm-adjusted) |
-| `bangla_rag/human.py`, `ragas_eval.py` | RQ2 grading sheet, RAGAS scoring, agreement statistics |
-| `tests/` | unit tests |
+`--rater ai` makes `detect` and `analyze` read the `ai_faithful` / `ai_relevant` columns instead of `human_*`.
+**Any AI-assisted grade must be disclosed** as such in the thesis, and agreement between a rater and labels they adopted from
+the AI is 1.0 by construction, so it must not be reported as inter-rater agreement.
+`ragas_eval` rate-limits judge calls, saves every batch and resumes, so a quota stop or Colab disconnect loses at most one batch.
 
 ## Metrics
 
@@ -62,8 +65,7 @@ Exact match and token-F1 against the reference answers; an answer counts as *cor
 
 ## What has and has not been tested
 
-Tested: text/metric/chunking/BM25/fusion/statistics code (unit tests) and a BM25 retrieval-only run on the real dataset.
-**Not yet run in the build environment:** dense embedders, FAISS, Gemini generation, RAGAS scoring. Run the Colab notebook's smoke-test cells first and fix any API-version issues before the full run.
+Unit tests (19, no API key or network): text/metric/chunking/BM25/fusion/statistics code and the RQ2 sampling and analysis code. The full pipeline (dense retrieval, Gemini generation, RAGAS scoring) is exercised end to end in the Colab notebook; its results are in `results/summary.md`.
 
 ## Attribution
 
