@@ -6,4 +6,4 @@ The experiments use the BanglaRQA dataset. Its 3,000 Wikipedia passages form the
 
 Retrieval raised the share of correct answers (F1 $\ge$ 0.5) from 28.0\% to 83.0--85.5\% (all $p < 0.0001$), but the three retrievers could not be told apart on 200 questions. RAGAS faithfulness separated unsupported from supported answers with an AUC of 0.91 (95\% CI 0.87--0.94) with English prompts and 0.92 (0.88--0.96) with Bengali prompts, a difference within noise. On randomly drawn answers, which are almost all faithful, it showed no usable correlation with the grades, and answer relevancy agreed only weakly ($\rho = 0.29$). The reference grades were drafted by a language model and reviewed by the author, which limits how far the second result can be trusted.
 
-This is a scoped pilot with one dataset, one generator and a small sample; the planned medical-textbook corpus was replaced by general-domain Wikipedia text.
+The study uses one dataset, one generator model and 200 questions; the planned medical-textbook corpus was replaced by general-domain Wikipedia text.
