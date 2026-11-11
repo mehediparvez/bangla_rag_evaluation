@@ -17,6 +17,28 @@ from pathlib import Path
 import pandas as pd
 
 
+# Hand-written Bengali versions of the RAGAS instructions (keys are prompt class names). Used only when RAGAS'
+# automatic translation of the few-shot examples fails; the examples then stay in English ("bengali-instruction").
+# Digits are kept ASCII (1 / 0) because the verdict fields are parsed as integers.
+MANUAL_BN_INSTRUCTIONS = {
+    "StatementGeneratorPrompt": (
+        "একটি প্রশ্ন এবং একটি উত্তর দেওয়া হলো। উত্তরের প্রতিটি বাক্যের জটিলতা বিশ্লেষণ করো। "
+        "প্রতিটি বাক্যকে এক বা একাধিক সম্পূর্ণ বোধগম্য বিবৃতিতে ভেঙে লেখো। "
+        "কোনো বিবৃতিতে সর্বনাম ব্যবহার করবে না। আউটপুট JSON ফরম্যাটে দাও।"
+    ),
+    "NLIStatementPrompt": (
+        "তোমার কাজ হলো প্রদত্ত প্রসঙ্গের (context) ভিত্তিতে কয়েকটি বিবৃতি কতটা বিশ্বস্ত (faithful) তা যাচাই করা। "
+        "প্রতিটি বিবৃতির জন্য verdict হিসেবে 1 দাও যদি বিবৃতিটি সরাসরি প্রসঙ্গ থেকে অনুমান করা যায়, "
+        "অথবা 0 দাও যদি সরাসরি অনুমান করা না যায়।"
+    ),
+    "ResponseRelevancePrompt": (
+        "প্রদত্ত উত্তরের জন্য একটি প্রশ্ন তৈরি করো এবং উত্তরটি অস্পষ্ট (noncommittal) কি না চিহ্নিত করো। "
+        "উত্তর অস্পষ্ট হলে noncommittal এর মান 1 এবং স্পষ্ট হলে 0 দাও। "
+        "অস্পষ্ট উত্তর হলো যা এড়িয়ে যায়, অনিশ্চিত বা দ্ব্যর্থক; যেমন \"আমি জানি না\" বা \"আমি নিশ্চিত নই\"।"
+    ),
+}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sheet", default="human/grading_sheet.csv")
@@ -71,11 +93,18 @@ def main(argv=None):
         for m in metrics:
             if not hasattr(m, "adapt_prompts"):
                 continue
-            try:
-                m.set_prompts(**m.load_prompts(str(prompt_dir), args.prompt_lang))
-                print(f"{m.name}: loaded saved '{args.prompt_lang}' prompts from {prompt_dir}")
-            except Exception:
-                for attempt in range(1, 6):
+            loaded = None
+            for lang in (args.prompt_lang, f"{args.prompt_lang}-instruction"):  # full translation, or the fallback variant
+                try:
+                    m.set_prompts(**m.load_prompts(str(prompt_dir), lang))
+                    loaded = lang
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+            if loaded:
+                print(f"{m.name}: loaded saved '{loaded}' prompts from {prompt_dir}")
+            else:
+                for attempt in range(1, 4):
                     try:
                         m.set_prompts(**asyncio.run(m.adapt_prompts(language=args.prompt_lang, llm=llm)))
                         m.save_prompts(str(prompt_dir))
@@ -84,7 +113,21 @@ def main(argv=None):
                     except Exception as e:  # noqa: BLE001
                         print(f"{m.name}: prompt adaptation attempt {attempt} failed: {str(e)[:120]}")
                 else:
-                    raise SystemExit(f"could not adapt {m.name} prompts to {args.prompt_lang}; try again later")
+                    if args.prompt_lang != "bengali":
+                        raise SystemExit(f"could not adapt {m.name} prompts to {args.prompt_lang}; try again later")
+                    import copy
+
+                    fallback = {}
+                    for pname, prompt in m.get_prompts().items():
+                        text = MANUAL_BN_INSTRUCTIONS.get(type(prompt).__name__)
+                        if text:
+                            q = copy.deepcopy(prompt)
+                            q.instruction, q.language = text, "bengali-instruction"
+                            fallback[pname] = q
+                    m.set_prompts(**fallback)
+                    m.save_prompts(str(prompt_dir))
+                    print(f"{m.name}: automatic translation failed; using hand-written Bengali instructions "
+                          f"(few-shot examples stay English). Report this variant as 'Bengali instructions only'.")
             print(f"  {m.name} prompt languages in use: { {n: p.language for n, p in m.get_prompts().items()} }")
 
     keep_cols = ["faithfulness", "answer_relevancy", "llm_context_precision_with_reference", "context_recall"]
