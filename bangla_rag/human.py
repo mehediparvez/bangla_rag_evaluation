@@ -145,7 +145,7 @@ def auc(pos, neg) -> float:
     return float(((d > 0).sum() + 0.5 * (d == 0).sum()) / d.size)
 
 
-def detect(sheet_path, ragas_paths: dict[str, str], key_path=None, seed=0, n_boot=2000):
+def detect(sheet_path, ragas_paths: dict[str, str], key_path=None, seed=0, n_boot=2000, rater="human"):
     """RAGAS faithfulness as a detector of unsupported answers.
 
     Unsupported = human_faithful < 3, or a synthetic row listed in the perturb key.
@@ -154,7 +154,7 @@ def detect(sheet_path, ragas_paths: dict[str, str], key_path=None, seed=0, n_boo
     """
     import numpy as np
     sheet = pd.read_csv(sheet_path, encoding="utf-8-sig")
-    sheet["hf"] = pd.to_numeric(sheet["human_faithful"], errors="coerce")
+    sheet["hf"] = pd.to_numeric(sheet[f"{rater}_faithful"], errors="coerce")
     synth = set(pd.read_csv(key_path)["row_id"]) if key_path and Path(key_path).exists() else set()
     sheet["synthetic"] = sheet["row_id"].isin(synth)
     sheet = sheet[sheet["hf"].isin([1, 2, 3]) | sheet["synthetic"]]
@@ -163,7 +163,7 @@ def detect(sheet_path, ragas_paths: dict[str, str], key_path=None, seed=0, n_boo
     for tag, path in ragas_paths.items():
         m = sheet.merge(pd.read_csv(path, encoding="utf-8-sig"), on="row_id").dropna(subset=["faithfulness"])
         good, bad = m[~m["bad"]]["faithfulness"].to_numpy(), m[m["bad"]]["faithfulness"].to_numpy()
-        print(f"[{tag}] supported n={len(good)}, unsupported n={len(bad)} (synthetic {int(m['synthetic'].sum())})")
+        print(f"[{tag}] reference rater: {rater}; supported n={len(good)}, unsupported n={len(bad)} (synthetic {int(m['synthetic'].sum())})")
         if len(good):
             print(f"  false-alarm rate (supported scored < 0.5): {(good < 0.5).mean():.3f}; mean faithfulness {good.mean():.3f}")
         if len(good) >= 5 and len(bad) >= 5:
@@ -185,8 +185,11 @@ def _ci(x, y):
     return f"{rho:.3f} [{lo:.3f}, {hi:.3f}]"
 
 
-def analyze(sheet_path, ragas_paths: dict[str, str], second_rater=None):
+def analyze(sheet_path, ragas_paths: dict[str, str], second_rater=None, rater="human"):
     sheet = pd.read_csv(sheet_path, encoding="utf-8-sig")
+    if rater != "human":  # e.g. "ai": grade columns named ai_faithful / ai_relevant; use them as the reference
+        sheet["human_faithful"], sheet["human_relevant"] = sheet[f"{rater}_faithful"], sheet[f"{rater}_relevant"]
+        print(f"reference rater: {rater}")
     graded = sheet.dropna(subset=["human_faithful", "human_relevant"]).copy()
     for col in ["human_faithful", "human_relevant"]:
         num = pd.to_numeric(graded[col], errors="coerce")
@@ -247,20 +250,22 @@ def main(argv=None):
     d.add_argument("--sheet", default="human/grading_sheet.csv")
     d.add_argument("--ragas", action="append", required=True)
     d.add_argument("--key", default="human/perturb_key.csv")
+    d.add_argument("--rater", default="human", help="grade column prefix: human or ai")
     a = sub.add_parser("analyze", help="compare RAGAS scores with human grades")
     a.add_argument("--sheet", default="human/grading_sheet.csv")
     a.add_argument("--ragas", action="append", required=True,
                    help="RAGAS score CSV; repeat to compare prompt languages (en first, then bn)")
+    a.add_argument("--rater", default="human", help="grade column prefix: human or ai")
     a.add_argument("--second-rater", help="second rater's filled copy of the sheet")
     args = ap.parse_args(argv)
     if args.cmd == "sample":
         make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out, args.extend, args.hard_frac,
                    args.closed_book, args.ctx_run, args.perturb)
     elif args.cmd == "detect":
-        detect(args.sheet, {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}, args.key)
+        detect(args.sheet, {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}, args.key, rater=args.rater)
     else:
         tags = {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}
-        analyze(args.sheet, tags, args.second_rater)
+        analyze(args.sheet, tags, args.second_rater, args.rater)
 
 
 if __name__ == "__main__":
