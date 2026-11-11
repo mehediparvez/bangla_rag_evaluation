@@ -22,7 +22,7 @@ Every question is answered under four settings that differ only in retrieval: no
 
 \textbf{Retrieval corpus.} All 3,000 passages from the training, validation and test splits form the retrieval pool, so retrieval must find the relevant passage among many distractors.
 
-\textbf{Questions.} Questions are drawn from the test split, keeping only answerable questions (1,124 of 1,493), and a seeded random sample of \todo{200} is used (seed 13).
+\textbf{Questions.} Questions are drawn from the test split, keeping only answerable questions (1,124 of 1,493), and a seeded random sample of 200 is used (seed 13).
 
 \textbf{Change of domain.} The original proposal planned a medical-biology corpus built from a Class 12 textbook. The textbook text could not be obtained within the project time, so this version uses general-domain BanglaRQA. Results therefore describe Wikipedia-style questions and should not be assumed to carry over to medical text. This is listed as a limitation in Chapter~5.
 
@@ -41,7 +41,7 @@ All retrieval settings return the top 3 chunks.
 
 \section{Generation}
 
-The generator is Google's Gemini \todo{confirm the exact model identifier used in the final run, e.g.\ gemini-3.5-flash-lite} at temperature 0 and a 512-token output limit, accessed through the free API tier. One fixed Bangla prompt is used: with retrieval, the model is told to answer using only the given passages and to reply ``no answer in the passages'' if they do not contain it; without retrieval it answers from its own knowledge. The model returns JSON with an answer and a short explanation. Every call is cached on disk, so a run can be resumed and repeated without new calls.
+The generator is Google's Gemini (model identifier \texttt{gemini-3.5-flash-lite}) at temperature 0 and a 512-token output limit, accessed through the free API tier. One fixed Bangla prompt is used: with retrieval, the model is told to answer using only the given passages and to reply ``no answer in the passages'' if they do not contain it; without retrieval it answers from its own knowledge. The model returns JSON with an answer and a short explanation. Every call is cached on disk, so a run can be resumed and repeated without new calls.
 
 \section{Metrics}
 
@@ -51,10 +51,14 @@ The generator is Google's Gemini \todo{confirm the exact model identifier used i
 
 \section{Statistical Analysis}
 
-Means are reported with 95\% bootstrap confidence intervals over questions. Settings are compared on the same questions with the exact McNemar test on the binary correct outcome, with Holm correction for multiple comparisons. For RQ2, agreement is measured with Spearman's rank correlation and a bootstrap confidence interval, and with quadratic-weighted Cohen's $\kappa$ if a second human rater grades a subset.
+Means are reported with 95\% bootstrap confidence intervals over questions. Settings are compared on the same questions with the exact McNemar test on the binary correct outcome, with Holm correction for multiple comparisons. For RQ2, RAGAS faithfulness is treated as a detector of unsupported answers: an answer is unsupported if its reference faithfulness grade is below 3 (or it is a synthetic row). We report the area under the ROC curve (AUC) with a bootstrap confidence interval, the false-alarm rate (supported answers that RAGAS scores below 0.5) and the detection rate (unsupported answers scored below 0.5). Spearman's rank correlation with a bootstrap confidence interval is reported as well, but it is inflated by the deliberately varied sample and is not the headline result.
 
-\section{RQ2: Human Grading and RAGAS}
+\section{RQ2: Human Grading and RAGAS}\label{sec:method-rq2}
 
-\textbf{Human grading.} About \todo{100} answers from the retrieval settings (excluding the no-retrieval run) are shuffled and graded by hand using a written rubric, without seeing RAGAS scores. \todo{Insert the rubric scale and state who graded, and whether a second grader labelled a subset.}
+\textbf{Rows graded.} In a random sample of retrieval-based answers almost every answer is faithful, so a correlation between RAGAS and a grade has almost nothing to measure (a ceiling effect; a first sample of 100 answers had 98 faithfulness grades of 3). The graded set therefore has 290 answers of four kinds: 100 randomly drawn answers from the BM25 and hybrid settings; 100 more, half of them drawn from answers that were likely to be bad (the reference answer is missing from the retrieved text, or F1 is below 0.5); 60 closed-book answers (produced without retrieval) shown with the passages that retrieval found for the same question, many of which are unsupported; and 30 synthetic unsupported answers, each an answer paired with the passages retrieved for a different question. The synthetic rows are unsupported by construction and are identified in a separate key file that is not shown during grading.
+
+\textbf{Grading scale.} Each answer is graded on two 1--3 scales from the passages shown only, not from the grader's own knowledge: faithfulness (is every claim in the answer supported by the passages; 1 = mostly unsupported, 2 = partly supported, 3 = fully supported) and relevance (does the answer address the question; 1 = off-topic or a refusal, 2 = partly, 3 = directly). An answer of the form ``the passages do not contain the answer'' is graded faithful 3 and relevant 1.
+
+\textbf{Who graded.} \todo{Edit to match what you actually did, and keep this disclosure.} The reference grades were first drafted by a large language model (Claude) acting as a rater that was told to judge only from the passages, and were then reviewed by the author, who accepted them. They are therefore AI-drafted, author-reviewed labels and not independent human judgements. Because the author's final grades equal the drafted grades on every row, no agreement statistic between two raters is reported (it would be 1.0 by construction). The reference labels are the main threat to the validity of RQ2, as discussed in Chapter~5.
 
 \textbf{RAGAS.} RAGAS (version 0.2.x) computes faithfulness and answer relevancy for the same answers, using Gemini as the judge model. The judge prompts are run in English, and in an experimental Bangla-adapted version, to test whether prompt language matters. Because the judge and the generator are both Gemini models, the judge may favour the generator's style; this is acknowledged as a limitation.

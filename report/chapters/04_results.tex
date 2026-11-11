@@ -1,10 +1,8 @@
 \chapter{Results}
 
-\todo{All numbers in this chapter must come from the finished runs. Run \texttt{python report/make\_tables.py} after \texttt{python -m bangla\_rag.analyze} to regenerate the tables below, then write the interpretation in your own words.}
-
 \section{Retrieval Quality}
 
-In an early check with BM25, 512-character chunks and the top 3 chunks on 100 questions, the correct passage was among the retrieved chunks for 99 of 100 questions, but a reference answer appeared in the retrieved text for only 77 of 100. \todo{Replace with the final figures for all retrieval settings on the full question sample.} The gap between the two numbers suggests that chunking, not passage finding, may limit answer quality.
+On the full sample of 200 questions, the passage that contains the answer was among the top three retrieved chunks for 98.0\% of questions with BM25, 96.0\% with dense retrieval and 99.0\% with the hybrid method (Table~\ref{tab:rq1-metrics}). A reference answer appeared verbatim in the retrieved text for only 73--75\% of questions. The gap of more than 20 points between finding the right passage and having the answer string in the retrieved chunks suggests that the 512-character chunking, not passage finding, limits what the generator can use. (Some answers are paraphrases and would not match as an exact string, so the second number is a lower bound on whether the answer was available.)
 
 \section{RQ1: Effect of Retrieval Method on Answer Accuracy}
 
@@ -24,12 +22,22 @@ Table~\ref{tab:rq1-metrics} shows the metrics for each setting, and Table~\ref{t
 	\IfFileExists{tables/rq1_mcnemar.tex}{\input{tables/rq1_mcnemar.tex}}{\todo{run make\_tables.py to create tables/rq1\_mcnemar.tex}}
 \end{table}
 
-\todo{Interpretation: does retrieval beat the baseline? Which retriever is best? Are the differences statistically distinguishable given the confidence intervals? Report honestly if they are not.}
+Retrieval helps a great deal. With no retrieval, only 28.0\% of answers were correct (F1 $\ge$ 0.5; 95\% CI 22.0--34.5) and exact match was 15.0\%. All three retrieval settings reach 83--86\% correct, a gain of 55 to 57.5 percentage points over the baseline. The paired tests agree: against the no-retrieval baseline, BM25 fixed 111 questions and broke 1, dense retrieval fixed 117 and broke 2, and the hybrid method fixed 113 and broke 1 (all Holm-adjusted $p < 0.0001$).
+
+The three retrievers cannot be separated on this sample. Their correct rates are 83.0\% (BM25), 85.5\% (dense) and 84.0\% (hybrid) with overlapping confidence intervals (for example 77.5--88.0 for BM25 and 80.0--90.0 for dense). Against the dense default, BM25 was better on 6 questions and worse on 11 (difference $-2.5$ points, Holm-adjusted $p = 0.66$), and the hybrid method was better on 5 and worse on 8 ($p = 0.66$). The hybrid method had the highest passage hit rate (99.0\%) and the highest exact match (44.0\%), but these differences are within the confidence intervals. With 200 questions the study can detect a large effect such as retrieval versus none, but not a difference of a few points between retrievers, so the honest conclusion is that no retriever is shown to be better than another.
 
 \section{RQ2: RAGAS Compared with Human Grades}
 
-\todo{Insert the Spearman $\rho$ with confidence interval for faithfulness and for answer relevancy, the difference between English and Bangla judge prompts, and Cohen's $\kappa$ if a second rater was used. Source: output of \texttt{python -m bangla\_rag.human analyze}.}
+\textbf{Random answers have no variance to measure.} On the first 100 randomly sampled answers, 98 faithfulness grades were 3, and RAGAS faithfulness showed no correlation with them ($\rho \approx 0$, with a very narrow interval, which is what a ceiling effect looks like). Answer relevance was similarly uninformative. This is why the graded set was extended with likely-bad, closed-book and synthetic unsupported answers (Section~\ref{sec:method-rq2}).
+
+\textbf{Detection of unsupported answers.} On the final 290 graded answers (220 supported, 69 unsupported, one without a score), RAGAS faithfulness with English judge prompts and Gemini as judge ranks unsupported answers below supported ones with an AUC of 0.909 (95\% CI 0.866--0.944). Using a threshold of 0.5, it flags 89.9\% of unsupported answers, but also 9.1\% of supported answers. The AUC is 0.955 on the 30 synthetic rows and 0.875 on the 39 natural unsupported rows (closed-book and low-F1 answers); the natural figure is the fairer estimate of performance on real RAG output. Supported answers had a mean faithfulness of 0.907.
+
+\textbf{Correlation.} Spearman's $\rho$ between RAGAS faithfulness and the faithfulness grade is 0.782 (95\% CI 0.700--0.853, $n = 289$). This is high but should not be read as agreement on ordinary answers: the sample deliberately mixes good and bad answers, which inflates a rank correlation. For answer relevance, $\rho = 0.294$ (0.167--0.398, $n = 285$). Only 13 of 290 answers have a relevance grade below 3, most of them refusals, so this estimate rests on very few informative rows, and RAGAS answer relevancy cannot be recommended as a stand-in for a grade here.
+
+\textbf{Prompt language.} \todo{Insert the Bangla-prompt result when the run is finished (AUC and false-alarm rate for judge prompts adapted to Bengali, scored on N rows), or state that it could not be completed. Note that RAGAS' automatic prompt translation failed on its first attempt with this judge model and succeeded on a retry.}
 
 \section{Discussion}
 
-\todo{Short discussion tying RQ1 and RQ2 together: what a practitioner building a Bangla RAG system should take from this, and where the results are too uncertain to say.}
+For a practitioner, two things follow. First, retrieval is the large effect: any of the three retrievers more than triples the share of correct Bangla answers over asking the model alone, and choosing among BM25, dense and hybrid matters much less than whether the retrieved text actually contains the answer (about a quarter of questions did not have the answer string in the top three chunks even when the right passage was found). Second, an English-prompted RAGAS faithfulness score is a usable screening tool for unsupported Bangla answers, with an AUC around 0.9, but it is not a clean pass/fail test: it flags roughly one in eleven good answers, so flagged answers need a look rather than automatic rejection.
+
+The results are uncertain in several places: the retrievers are not separated, the unsupported examples are few (69, of which 30 are synthetic), and the reference grades are AI-drafted and author-reviewed (Chapter~5).

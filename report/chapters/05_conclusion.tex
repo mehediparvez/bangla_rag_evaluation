@@ -2,7 +2,9 @@
 
 \section{Conclusion}
 
-\todo{Write after the results are final. State the answer to RQ1 and RQ2 in two or three sentences each, with the key numbers and their confidence intervals.}
+\textbf{RQ1.} Retrieval strongly improves Bangla question answering with a Gemini generator: the share of correct answers rose from 28.0\% (95\% CI 22.0--34.5) with no retrieval to 83.0\% (77.5--88.0) with BM25, 85.5\% (80.0--90.0) with dense BGE-M3 retrieval and 84.0\% (79.0--89.0) with a hybrid of the two. Differences between the three retrievers are within noise on 200 questions (Holm-adjusted $p \ge 0.66$), so the choice of retriever is not shown to matter here. More than 20 points separate finding the right passage (96--99\%) from having the answer string in the retrieved chunks (73--75\%), which points to chunking as the next thing to examine.
+
+\textbf{RQ2.} On a graded set that deliberately includes unsupported answers, RAGAS faithfulness with English judge prompts detects unsupported Bangla answers well (AUC 0.909, 95\% CI 0.866--0.944; 0.875 on the natural unsupported answers alone) at the cost of flagging 9.1\% of supported answers. Its answer relevancy score is not a usable stand-in for a relevance grade here ($\rho = 0.294$, and relevance grades barely vary). On ordinary random answers, which are almost all faithful, no correlation can be measured at all.
 
 \section{Limitations}
 
@@ -10,7 +12,10 @@
 	\item \textbf{Domain change.} The planned medical-textbook corpus was replaced by general-domain Bangla Wikipedia (BanglaRQA), so results may not carry over to medical text.
 	\item \textbf{Possible training exposure.} The generator may have seen Wikipedia text during training; the no-retrieval baseline measures this, but cannot remove it.
 	\item \textbf{One dataset and one generator.} Findings describe this dataset and this model family, not Bangla RAG in general.
-	\item \textbf{Sample size.} With a few hundred questions, and about 100 human-graded answers, confidence intervals are wide, so small differences between settings cannot be resolved.
+	\item \textbf{Sample size.} With 200 questions, and 290 graded answers of which 69 are unsupported (30 of them synthetic), confidence intervals are wide, so small differences between settings cannot be resolved.
+	\item \textbf{Reference grades are AI-drafted.} The faithfulness and relevance grades were drafted by a language model (Claude) from the passages and then reviewed and accepted by the author, with no independent human rater and no measured human--human agreement. A judge model and a labelling model from different families may share biases, and the RQ2 results are only as good as these labels.
+	\item \textbf{Constructed evaluation set.} The graded set was built to contain unsupported answers (closed-book answers and answers paired with another question's passages). The synthetic rows are the easiest case for a detector, and the correlation computed on this mixture is higher than it would be on ordinary RAG output.
+	\item \textbf{Prompt language not fully tested.} Only English judge prompts were scored on the full set. \todo{Update with the Bengali-prompt result or state that it was not completed.}
 	\item \textbf{One factor at a time.} Retrieval method was varied with chunk size and number of chunks held fixed, so interactions between them are not measured.
 	\item \textbf{Judge and generator from the same family.} Gemini both generates and judges, which may bias the RAGAS scores toward the generator.
 	\item \textbf{Literature search.} The search was web-based; ``no prior study found'' statements should be checked against Google Scholar and Semantic Scholar.
@@ -21,6 +26,6 @@
 \begin{itemize}
 	\item Repeat the study on the original medical-textbook corpus if the text becomes available.
 	\item Vary chunk size, number of retrieved chunks and the embedding model, including a Bengali sentence encoder and multilingual E5.
-	\item Add a second, independent judge model, and a second human grader to measure human--human agreement.
+	\item Add a second, independent judge model, and independent human graders (blind to any model-drafted labels) to measure human--human and human--model agreement.
 	\item Test open-weight generators, to see whether the findings hold outside one commercial model family.
 \end{itemize}

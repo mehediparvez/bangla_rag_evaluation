@@ -1,0 +1,11 @@
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Setting} & \textbf{paired n} & \textbf{better than none only} & \textbf{worse only} & \textbf{diff (acc)} & \textbf{p (exact)} & \textbf{p (Holm)} \\
+\midrule
+BM25 & 200 & 111 & 1 & 0.550 & 0.000 & 0.000 \\
+dense (BGE-M3) & 200 & 117 & 2 & 0.575 & 0.000 & 0.000 \\
+hybrid (BM25 + BGE-M3) & 200 & 113 & 1 & 0.560 & 0.000 & 0.000 \\
+\bottomrule
+\end{tabular}%
+}

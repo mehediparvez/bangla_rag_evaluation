@@ -17,7 +17,8 @@ python -m bangla_rag.analyze --results results
 python report/make_tables.py --results results     # writes report/tables/*.tex
 ```
 
-The RQ2 numbers (Spearman, kappa) are printed by `python -m bangla_rag.human analyze` and are typed into Chapter 4 by hand.
+The RQ2 numbers (AUC, false-alarm rate, Spearman) are printed by `python -m bangla_rag.human detect` and `analyze` and are typed into Chapter 4 by hand.
+The committed `tables/rq1_*.tex` were generated with `make_tables.latex_table` from the summary printed by `bangla_rag.analyze` in Colab (the result files live on Drive, not in this repo); re-run `make_tables.py` if you have `results/` locally.
 
 ## Bibliography
 `ref.bib` entries marked `% CHECK` came from search notes. Verify each one on the publisher or arXiv page before submitting.
