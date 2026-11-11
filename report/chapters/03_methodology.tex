@@ -8,10 +8,8 @@ Every question is answered under four settings that differ only in retrieval: no
 
 \begin{figure}[H]
 	\centering
-	\fbox{\parbox{0.92\textwidth}{\centering\small
-		Question $\rightarrow$ [retriever: none / BM25 / dense / hybrid] $\rightarrow$ top-3 chunks $\rightarrow$ Bangla prompt $\rightarrow$ Gemini $\rightarrow$ JSON answer $\rightarrow$ metrics
-	}}
-	\caption{The experimental pipeline. \todo{Replace this placeholder with a proper diagram, for example the pipeline figure from the defence map.}}
+	\includegraphics[width=\textwidth]{pipeline.png}
+	\caption{The experimental pipeline. Only the retriever changes between settings (RQ1); the same answers are then scored by the RAGAS judge and compared with reference grades (RQ2).}
 	\label{fig:pipeline}
 \end{figure}
 

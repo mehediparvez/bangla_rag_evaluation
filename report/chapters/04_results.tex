@@ -4,6 +4,13 @@
 
 On the full sample of 200 questions, the passage that contains the answer was among the top three retrieved chunks for 98.0\% of questions with BM25, 96.0\% with dense retrieval and 99.0\% with the hybrid method (Table~\ref{tab:rq1-metrics}). A reference answer appeared verbatim in the retrieved text for only 73--75\% of questions. The gap of more than 20 points between finding the right passage and having the answer string in the retrieved chunks suggests that the 512-character chunking, not passage finding, limits what the generator can use. (Some answers are paraphrases and would not match as an exact string, so the second number is a lower bound on whether the answer was available.)
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\textwidth]{retrieval_gap.png}
+	\caption{Share of questions where the right passage was retrieved, and where the reference answer string appears in the retrieved chunks (200 questions).}
+	\label{fig:retrieval-gap}
+\end{figure}
+
 \section{RQ1: Effect of Retrieval Method on Answer Accuracy}
 
 Table~\ref{tab:rq1-metrics} shows the metrics for each setting, and Table~\ref{tab:rq1-mcnemar} shows paired tests against the no-retrieval baseline.
@@ -22,6 +29,13 @@ Table~\ref{tab:rq1-metrics} shows the metrics for each setting, and Table~\ref{t
 	\IfFileExists{tables/rq1_mcnemar.tex}{\input{tables/rq1_mcnemar.tex}}{\todo{run make\_tables.py to create tables/rq1\_mcnemar.tex}}
 \end{table}
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\textwidth]{rq1_correct.png}
+	\caption{Share of correct answers (F1 $\ge$ 0.5) per setting, with 95\% bootstrap confidence intervals (200 questions).}
+	\label{fig:rq1-correct}
+\end{figure}
+
 Retrieval helps a great deal. With no retrieval, only 28.0\% of answers were correct (F1 $\ge$ 0.5; 95\% CI 22.0--34.5) and exact match was 15.0\%. All three retrieval settings reach 83--86\% correct, a gain of 55 to 57.5 percentage points over the baseline. The paired tests agree: against the no-retrieval baseline, BM25 fixed 111 questions and broke 1, dense retrieval fixed 117 and broke 2, and the hybrid method fixed 113 and broke 1 (all Holm-adjusted $p < 0.0001$).
 
 The three retrievers cannot be separated on this sample. Their correct rates are 83.0\% (BM25), 85.5\% (dense) and 84.0\% (hybrid) with overlapping confidence intervals (for example 77.5--88.0 for BM25 and 80.0--90.0 for dense). Against the dense default, BM25 was better on 6 questions and worse on 11 (difference $-2.5$ points, Holm-adjusted $p = 0.66$), and the hybrid method was better on 5 and worse on 8 ($p = 0.66$). The hybrid method had the highest passage hit rate (99.0\%) and the highest exact match (44.0\%), but these differences are within the confidence intervals. With 200 questions the study can detect a large effect such as retrieval versus none, but not a difference of a few points between retrievers, so the honest conclusion is that no retriever is shown to be better than another.
@@ -30,11 +44,25 @@ The three retrievers cannot be separated on this sample. Their correct rates are
 
 \textbf{Random answers have no variance to measure.} On the first 100 randomly sampled answers, 98 faithfulness grades were 3, and RAGAS faithfulness showed no correlation with them ($\rho \approx 0$, with a very narrow interval, which is what a ceiling effect looks like). Answer relevance was similarly uninformative. This is why the graded set was extended with likely-bad, closed-book and synthetic unsupported answers (Section~\ref{sec:method-rq2}).
 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.75\textwidth]{grade_mix.png}
+	\caption{Distribution of the reference grades on the 290 graded answers. Most answers are fully faithful and relevant, which is why the graded set was enriched with unsupported answers.}
+	\label{fig:grade-mix}
+\end{figure}
+
 \textbf{Detection of unsupported answers.} On the final 290 graded answers (220 supported, 69 unsupported, one without a score), RAGAS faithfulness with English judge prompts and Gemini as judge ranks unsupported answers below supported ones with an AUC of 0.909 (95\% CI 0.866--0.944). Using a threshold of 0.5, it flags 89.9\% of unsupported answers, but also 9.1\% of supported answers. The AUC is 0.955 on the 30 synthetic rows and 0.875 on the 39 natural unsupported rows (closed-book and low-F1 answers); the natural figure is the fairer estimate of performance on real RAG output. Supported answers had a mean faithfulness of 0.907.
 
 \textbf{Correlation.} Spearman's $\rho$ between RAGAS faithfulness and the faithfulness grade is 0.782 (95\% CI 0.700--0.853, $n = 289$). This is high but should not be read as agreement on ordinary answers: the sample deliberately mixes good and bad answers, which inflates a rank correlation. For answer relevance, $\rho = 0.294$ (0.167--0.398, $n = 285$). Only 13 of 290 answers have a relevance grade below 3, most of them refusals, so this estimate rests on very few informative rows, and RAGAS answer relevancy cannot be recommended as a stand-in for a grade here.
 
 \textbf{Prompt language.} RAGAS can translate its own judge prompts (instructions and few-shot examples) into another language. This automatic step is experimental and failed intermittently with this judge model; for the reported run it succeeded and the translated prompts were checked in the log to be the ones in use. All 290 answers were scored again with the Bengali prompts. Detection AUC was 0.919 (95\% CI 0.878--0.955) against 0.909 (0.866--0.944) with English prompts; 7.3\% against 9.1\% of supported answers were flagged, and 91.2\% against 89.9\% of unsupported answers were detected. The Spearman correlation with the faithfulness grade was 0.807 (0.733--0.874, $n = 288$) against 0.782 (0.700--0.853), and for answer relevancy 0.246 (0.126--0.346) against 0.294 (0.167--0.398). All differences are small and the intervals overlap almost completely. Judge scores also vary from run to run: re-scoring the same 50 answers with identical English prompts moved the AUC from 0.873 to 0.784 in an earlier check. The result is therefore that Bengali judge prompts neither helped nor hurt measurably here; it is not evidence that either language is better.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\textwidth]{rq2_ragas.png}
+	\caption{RAGAS faithfulness and answer relevancy compared with the reference grades, for English and Bengali judge prompts (290 graded answers; error bars are 95\% bootstrap intervals).}
+	\label{fig:rq2}
+\end{figure}
 
 \section{Discussion}
 
