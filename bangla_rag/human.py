@@ -36,7 +36,7 @@ def _is_hard(r) -> bool:
 
 
 def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0.0,
-               closed_book=0, ctx_run="bm25_c512_k3") -> pd.DataFrame:
+               closed_book=0, ctx_run="bm25_c512_k3", perturb=0) -> pd.DataFrame:
     """Sample ``n`` rows. ``hard_frac`` of them come from likely-bad answers (see ``_is_hard``).
 
     With ``extend`` (a previously graded sheet) its rows are kept unchanged, the new rows exclude
@@ -89,6 +89,28 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
                 "contexts": "\n---\n".join(c["contexts"]), "reference": " | ".join(r["references"]),
                 "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
             })
+    perturbed = []
+    if perturb > 0:
+        # Synthetic unsupported answers: an answer paired with the passages retrieved for a DIFFERENT
+        # question. The label is known by construction; row_ids are written to perturb_key.csv, and the
+        # run_id shown to the rater is the source run, so the sheet does not reveal them.
+        run_id = run_ids[0]
+        df = runs[run_id]
+        pool = [i for i in range(len(df)) if (run_id, df.iloc[i]["question_id"]) not in taken]
+        picks = rng.sample(pool, min(perturb, len(pool)))
+        for i in picks:
+            r = df.iloc[i]
+            others = [j for j in range(len(df)) if df.iloc[j]["gold_passage_id"] != r["gold_passage_id"]]
+            o = df.iloc[rng.choice(others)]
+            rows.append({
+                "run_id": run_id, "question_id": r["question_id"], "question": r["question"],
+                "contexts": "
+---
+".join(o["contexts"]), "reference": " | ".join(r["references"]),
+                "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
+            })
+            perturbed.append((run_id, r["question_id"]))
+        print(f"perturb: {len(picks)} answers paired with passages from another question")
     rng.shuffle(rows)  # hide the run order and the hard/easy split from the rater
     sheet = pd.DataFrame(rows)
     first = int(old["row_id"].max()) + 1 if old is not None else 1
@@ -97,11 +119,69 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
         sheet = pd.concat([old, sheet], ignore_index=True)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if perturbed:
+        new_rows = sheet.iloc[len(old) if old is not None else 0:]
+        ids = [int(x.row_id) for x in new_rows.itertuples()
+               if any(x.run_id == a and x.question_id == b and x.contexts != _own(runs, a, b) for a, b in perturbed)]
+        key = out_path.parent / "perturb_key.csv"
+        prev = pd.read_csv(key)["row_id"].tolist() if key.exists() else []
+        pd.DataFrame({"row_id": prev + ids}).to_csv(key, index=False)
+        print(f"{len(ids)} synthetic row ids saved to {key} (keep this file; do not share it with the rater)")
     sheet[SHEET_COLS].to_csv(out_path, index=False, encoding="utf-8-sig")
     (out_path.parent / "RUBRIC.txt").write_text(RUBRIC, encoding="utf-8")
     new = len(sheet) - (len(old) if old is not None else 0)
     print(f"wrote {len(sheet)} rows to {out_path} ({new} new, ungraded)\n\n{RUBRIC}")
     return sheet
+
+
+def _own(runs, run_id, qid) -> str:
+    df = runs[run_id]
+    return "
+---
+".join(df[df["question_id"] == qid].iloc[0]["contexts"])
+
+
+def auc(pos, neg) -> float:
+    """P(score_pos > score_neg), ties count half."""
+    import numpy as np
+    pos, neg = np.asarray(pos, float), np.asarray(neg, float)
+    d = pos[:, None] - neg[None, :]
+    return float(((d > 0).sum() + 0.5 * (d == 0).sum()) / d.size)
+
+
+def detect(sheet_path, ragas_paths: dict[str, str], key_path=None, seed=0, n_boot=2000):
+    """RAGAS faithfulness as a detector of unsupported answers.
+
+    Unsupported = human_faithful < 3, or a synthetic row listed in the perturb key.
+    Reports AUC (low faithfulness should rank unsupported answers) and the false-alarm rate
+    (supported answers scored below 0.5).
+    """
+    import numpy as np
+    sheet = pd.read_csv(sheet_path, encoding="utf-8-sig")
+    sheet["hf"] = pd.to_numeric(sheet["human_faithful"], errors="coerce")
+    synth = set(pd.read_csv(key_path)["row_id"]) if key_path and Path(key_path).exists() else set()
+    sheet["synthetic"] = sheet["row_id"].isin(synth)
+    sheet = sheet[sheet["hf"].isin([1, 2, 3]) | sheet["synthetic"]]
+    sheet["bad"] = sheet["synthetic"] | (sheet["hf"] < 3)
+    rng = np.random.default_rng(seed)
+    for tag, path in ragas_paths.items():
+        m = sheet.merge(pd.read_csv(path, encoding="utf-8-sig"), on="row_id").dropna(subset=["faithfulness"])
+        good, bad = m[~m["bad"]]["faithfulness"].to_numpy(), m[m["bad"]]["faithfulness"].to_numpy()
+        print(f"[{tag}] supported n={len(good)}, unsupported n={len(bad)} (synthetic {int(m['synthetic'].sum())})")
+        if len(good):
+            print(f"  false-alarm rate (supported scored < 0.5): {(good < 0.5).mean():.3f}; mean faithfulness {good.mean():.3f}")
+        if len(good) >= 5 and len(bad) >= 5:
+            a = auc(-bad, -good)
+            boots = [auc(-rng.choice(bad, len(bad)), -rng.choice(good, len(good))) for _ in range(n_boot)]
+            lo, hi = np.percentile(boots, [2.5, 97.5])
+            print(f"  AUC unsupported vs supported: {a:.3f} [{lo:.3f}, {hi:.3f}]")
+            print(f"  detection rate (unsupported scored < 0.5): {(bad < 0.5).mean():.3f}")
+            for name, mask in [("synthetic", m["synthetic"]), ("natural (human-graded)", m["bad"] & ~m["synthetic"])]:
+                sub = m[mask]["faithfulness"].to_numpy()
+                if len(sub) >= 5:
+                    print(f"    AUC {name} (n={len(sub)}): {auc(-sub, -good):.3f}")
+        else:
+            print("  too few unsupported rows for an AUC yet")
 
 
 def _ci(x, y):
@@ -164,7 +244,13 @@ def main(argv=None):
     s.add_argument("--closed-book", type=int, default=0,
                    help="add N no-retrieval answers shown with the retrieved passages (naturally unsupported cases)")
     s.add_argument("--ctx-run", default="bm25_c512_k3", help="run whose passages are shown for closed-book rows")
+    s.add_argument("--perturb", type=int, default=0,
+                   help="add N synthetic unsupported rows (answer + passages of another question); ids go to perturb_key.csv")
     s.add_argument("--extend", help="graded sheet to keep; adds --n NEW rows after it (write to a different --out)")
+    d = sub.add_parser("detect", help="AUC / false-alarm analysis of RAGAS faithfulness")
+    d.add_argument("--sheet", default="human/grading_sheet.csv")
+    d.add_argument("--ragas", action="append", required=True)
+    d.add_argument("--key", default="human/perturb_key.csv")
     a = sub.add_parser("analyze", help="compare RAGAS scores with human grades")
     a.add_argument("--sheet", default="human/grading_sheet.csv")
     a.add_argument("--ragas", action="append", required=True,
@@ -173,7 +259,9 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.cmd == "sample":
         make_sheet(args.results, args.runs.split(","), args.n, args.seed, args.out, args.extend, args.hard_frac,
-                   args.closed_book, args.ctx_run)
+                   args.closed_book, args.ctx_run, args.perturb)
+    elif args.cmd == "detect":
+        detect(args.sheet, {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}, args.key)
     else:
         tags = {Path(p).stem.replace("ragas_", ""): p for p in args.ragas}
         analyze(args.sheet, tags, args.second_rater)
