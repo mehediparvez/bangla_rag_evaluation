@@ -64,9 +64,28 @@ def main(argv=None):
         metrics += [LLMContextPrecisionWithReference(llm=llm), LLMContextRecall(llm=llm)]
 
     if args.prompt_lang:  # experimental: translate RAGAS' internal prompts
+        # adapt_prompts() only RETURNS the translated prompts; they must be applied with set_prompts().
+        # The translation is an LLM call that sometimes fails, so retry, and cache the result on disk.
+        prompt_dir = Path(args.out_dir) / f"prompts_{args.prompt_lang}"
+        prompt_dir.mkdir(parents=True, exist_ok=True)
         for m in metrics:
-            if hasattr(m, "adapt_prompts"):
-                asyncio.run(m.adapt_prompts(language=args.prompt_lang, llm=llm))
+            if not hasattr(m, "adapt_prompts"):
+                continue
+            try:
+                m.set_prompts(**m.load_prompts(str(prompt_dir), args.prompt_lang))
+                print(f"{m.name}: loaded saved '{args.prompt_lang}' prompts from {prompt_dir}")
+            except Exception:
+                for attempt in range(1, 6):
+                    try:
+                        m.set_prompts(**asyncio.run(m.adapt_prompts(language=args.prompt_lang, llm=llm)))
+                        m.save_prompts(str(prompt_dir))
+                        print(f"{m.name}: adapted prompts to '{args.prompt_lang}' (attempt {attempt}), saved to {prompt_dir}")
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        print(f"{m.name}: prompt adaptation attempt {attempt} failed: {str(e)[:120]}")
+                else:
+                    raise SystemExit(f"could not adapt {m.name} prompts to {args.prompt_lang}; try again later")
+            print(f"  {m.name} prompt languages in use: { {n: p.language for n, p in m.get_prompts().items()} }")
 
     keep_cols = ["faithfulness", "answer_relevancy", "llm_context_precision_with_reference", "context_recall"]
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
