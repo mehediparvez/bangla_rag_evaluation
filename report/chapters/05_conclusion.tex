@@ -9,7 +9,7 @@
 \section{Limitations}
 
 \begin{itemize}
-	\item \textbf{Domain change.} The planned medical-textbook corpus was replaced by general-domain Bangla Wikipedia (BanglaRQA), so results may not carry over to medical text.
+	\item \textbf{Single domain.} The questions and passages come from general-domain Bangla Wikipedia (BanglaRQA), so results may not carry over to specialised text such as medical material.
 	\item \textbf{Possible training exposure.} The generator may have seen Wikipedia text during training; the no-retrieval baseline measures this, but cannot remove it.
 	\item \textbf{One dataset and one generator.} Findings describe this dataset and this model family, not Bangla RAG in general.
 	\item \textbf{Sample size.} With 200 questions, and 290 graded answers of which 69 are unsupported (30 of them synthetic), confidence intervals are wide, so small differences between settings cannot be resolved.
@@ -24,7 +24,7 @@
 \section{Future Research Directions}
 
 \begin{itemize}
-	\item Repeat the study on the original medical-textbook corpus if the text becomes available.
+	\item Repeat the study on a specialised corpus, for example a medical textbook.
 	\item Vary chunk size, number of retrieved chunks and the embedding model, including a Bengali sentence encoder and multilingual E5.
 	\item Add a second, independent judge model, and independent human graders (blind to any model-drafted labels) to measure human--human and human--model agreement.
 	\item Test open-weight generators, to see whether the findings hold outside one commercial model family.
