@@ -104,9 +104,7 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
             o = df.iloc[rng.choice(others)]
             rows.append({
                 "run_id": run_id, "question_id": r["question_id"], "question": r["question"],
-                "contexts": "
----
-".join(o["contexts"]), "reference": " | ".join(r["references"]),
+                "contexts": "\n---\n".join(o["contexts"]), "reference": " | ".join(r["references"]),
                 "response": r["answer"], "human_faithful": "", "human_relevant": "", "notes": "",
             })
             perturbed.append((run_id, r["question_id"]))
@@ -136,9 +134,7 @@ def make_sheet(results_dir, run_ids, n, seed, out_path, extend=None, hard_frac=0
 
 def _own(runs, run_id, qid) -> str:
     df = runs[run_id]
-    return "
----
-".join(df[df["question_id"] == qid].iloc[0]["contexts"])
+    return "\n---\n".join(df[df["question_id"] == qid].iloc[0]["contexts"])
 
 
 def auc(pos, neg) -> float:
