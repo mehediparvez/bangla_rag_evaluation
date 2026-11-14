@@ -274,30 +274,14 @@ To see what the failures look like, I took all answerable questions where the ri
 	\end{tabular}
 \end{table}
 
-Table~\ref{tab:examples} lists some of these failures from the gold condition. They are the first failures in the output file whose reference and prediction are short; the six that are left out are long sentences or look much like the ones shown, and none was dropped for being too good or too bad. Most of the short ones differ by a word or a suffix, for example a unit that is missing, a descriptor that is added, or a verb ending (\bn{হিলকে} against \bn{হিল}). Two are wrong (\bn{নয়টি} against \bn{সাতটি}, and the unrelated phrase for \bn{ইসরাইল}).
+Figure~\ref{fig:examples} shows some of these failures from the gold condition. They are the first failures in the output file whose reference and prediction are short; the six that are left out are long sentences or look much like the ones shown, and none was dropped for being too good or too bad. Most of the short ones differ by a word or a suffix: a unit that is missing, a descriptor that is added, or a case ending on a name. Two are wrong, one with a different number and one with a phrase from the passage that does not answer the question.
 
-\begin{table}[H]
+\begin{figure}[H]
 	\centering
-	\caption{Examples of exact-match failures with the correct passage (gold condition).}
-	\label{tab:examples}
-	\small
-	\renewcommand{\arraystretch}{1.25}
-	{\linespread{1.0}\selectfont
-	\begin{tabular}{llp{4.6cm}p{5.4cm}r}
-		\toprule
-		Type & & Reference & Prediction & F1 \\
-		\midrule
-		factoid & & \bn{২-৩ সেন্টিমিটার} & \bn{২-৩} & 0.67 \\
-		factoid & & \bn{খুব অল্প} & \bn{খুব অল্প পরিমাণেই জানা গেছে} & 0.57 \\
-		factoid & & \bn{মধুমালা চট্টোপাধ্যায়} & \bn{বাঙালি নৃতত্ত্ববিদ মধুমালা চট্টোপাধ্যায়} & 0.67 \\
-		factoid & & \bn{বৃটেনের রোল্যান্ড হিল} & \bn{রোল্যান্ড হিলকে} & 0.40 \\
-		factoid & & \bn{পাওয়ারপিসি} & \bn{পাওয়ারপিসি প্ল্যাটফর্মের} & 0.67 \\
-		list & & \bn{হাইফা বন্দর; আশদোদ বন্দর; ইয়ালাত বন্দর} & \bn{হাইফা বন্দর; আশদোদ বন্দর ; ইয়ালাত} & 0.89 \\
-		factoid & & \bn{নয়টি} & \bn{সাতটি} & 0.00 \\
-		factoid & & \bn{ইসরাইল} & \bn{হাইফা শহরের কেন্দ্রস্থল উপকূলে উত্তরে ভূমধ্যসাগরের দক্ষিণে} & 0.00 \\
-		\bottomrule
-	\end{tabular}}
-\end{table}
+	\IfFileExists{figures/examples_table.png}{\includegraphics[width=\textwidth]{figures/examples_table.png}}{\todo{figures/examples\_table.png is missing}}
+	\caption{Examples of exact-match failures with the correct passage (gold condition): question type, reference answer, prediction and F1.}
+	\label{fig:examples}
+\end{figure}
 
 \section{Error Analysis by Hand}
 \label{sec:errors}

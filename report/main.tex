@@ -1,5 +1,4 @@
-% !TeX program = xelatex
-% Needs XeLaTeX (Bengali examples). The bibliography uses Biber (Overleaf runs it automatically).
+% Compiles with pdfLaTeX. The bibliography uses BibTeX (Overleaf runs it automatically).
 \documentclass[12pt]{report}
 
 % Font: TeX Gyre Termes is a Times New Roman clone that ships with TeX Live and Overleaf.
@@ -13,15 +12,6 @@
 \else
   \usepackage{fontspec}
   \setmainfont{TeX Gyre Termes}
-  % Bengali text for the examples: Noto Serif Bengali if installed, otherwise FreeSerif.
-  \IfFontExistsTF{Noto Serif Bengali}%
-    {\newfontfamily\bnfont[Script=Bengali]{Noto Serif Bengali}}%
-    {\newfontfamily\bnfont[Script=Bengali]{FreeSerif}}
-\fi
-\ifPDFTeX
-  \newcommand{\bn}[1]{\textit{[Bengali text: compile with XeLaTeX]}}
-\else
-  \newcommand{\bn}[1]{{\bnfont #1}}
 \fi
 
 \usepackage{graphicx}
@@ -36,10 +26,6 @@
 \usepackage{array,multirow}
 \usepackage{booktabs}
 \usepackage{enumitem}
-\usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning}
-\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
-\addbibresource{ref.bib}
 
 \usepackage[parfill]{parskip}
 \usepackage{geometry}
@@ -152,6 +138,8 @@ First and foremost, I thank the Almighty Allah for the health and determination 
 % ============================ REFERENCES ============================
 \clearpage
 \addcontentsline{toc}{chapter}{\numberline{}References}
-\printbibliography[title={References}]
+\renewcommand{\bibname}{References}
+\bibliographystyle{unsrt}
+\bibliography{ref}
 
 \end{document}

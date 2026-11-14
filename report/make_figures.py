@@ -102,3 +102,38 @@ fig.tight_layout()
 fig.savefig(OUT / "hit_vs_miss.png", dpi=200)
 plt.close(fig)
 print("saved:", *sorted(p.name for p in OUT.glob("*.png")))
+
+# ---- the pipeline diagram (replaces a TikZ drawing, which is slow to compile) -----------------------------
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+fig, ax = plt.subplots(figsize=(8.6, 3.0))
+ax.set_xlim(0, 107)
+ax.set_ylim(-4, 32)
+ax.axis("off")
+
+
+def box(x, y, w, h, text):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.4,rounding_size=1.2", fc="white", ec="#333", lw=1.2))
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=9.5)
+
+
+def arrow(p, q):
+    ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=13, lw=1.4, color="#333"))
+
+
+box(1, 17, 13, 9, "Question")
+box(20, 17, 27, 9, "Retriever\n(BM25 / dense / hybrid)")
+box(53, 17, 13, 9, "Top-1\npassage")
+box(72, 17, 15, 9, "Fine-tuned\nBanglaT5")
+box(92, 17, 13, 9, "Answer\nor empty")
+box(20, 3, 27, 8, "Library of\n3,000 passages")
+arrow((14.9, 21.5), (19.3, 21.5))
+arrow((47.9, 21.5), (52.3, 21.5))
+arrow((66.9, 21.5), (71.3, 21.5))
+arrow((87.9, 21.5), (91.3, 21.5))
+arrow((33.5, 11.9), (33.5, 16.3))
+ax.plot([7.5, 7.5, 79.5], [16.3, -2, -2], color="#333", lw=1.4)
+arrow((79.5, -2), (79.5, 16.3))
+fig.savefig(OUT / "pipeline.png", dpi=200, bbox_inches="tight")
+plt.close(fig)
+print("saved pipeline.png")
