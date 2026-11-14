@@ -73,3 +73,13 @@ def test_length_grouped_batches_cover_everything_and_group_by_length():
     assert all(len(batch) <= 8 for batch in a)
     spread = sum(max(lengths[i] for i in bt) - min(lengths[i] for i in bt) for bt in a) / len(a)
     assert spread < 150                                         # random batches would be ~700
+
+
+@pytest.mark.skipif(not (DATA / "Test.json").exists(), reason="BanglaRQA not downloaded")
+def test_load_passages_covers_all_3000_and_every_question_has_its_passage():
+    from bangla_rag.t5_data import load_passages
+
+    ident = lambda s: s
+    passages = load_passages(DATA, normalize=ident)
+    assert len(passages) == 3000
+    assert all(it["passage_id"] in passages for it in load_items(DATA, "Test", normalize=ident))

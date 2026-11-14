@@ -63,3 +63,9 @@ def length_grouped_batches(lengths: list[int], batch_size: int, rng, mega: int =
         batches += [part[b : b + batch_size] for b in range(0, len(part), batch_size)]
     rng.shuffle(batches)
     return batches
+
+
+def load_passages(data_dir: str | Path, normalize=None, splits=("Train", "Validation", "Test")) -> dict[str, str]:
+    """passage_id -> normalised passage text, over the given splits (all 3,000 by default)."""
+    normalize = normalize or get_normalizer()
+    return {p["passage_id"]: normalize(p["context"]) for s in splits for p in load_split(data_dir, s)}
