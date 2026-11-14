@@ -46,3 +46,20 @@ def load_items(data_dir: str | Path, split: str, normalize=None) -> list[dict]:
                 }
             )
     return items
+
+
+def length_grouped_batches(lengths: list[int], batch_size: int, rng, mega: int = 50) -> list[list[int]]:
+    """Batches of example indices with similar lengths, so padding wastes little compute.
+
+    Shuffle, cut into chunks of ``batch_size * mega``, sort each chunk by length,
+    split into batches, then shuffle the batch order. Every index appears once.
+    """
+    idx = list(range(len(lengths)))
+    rng.shuffle(idx)
+    chunk = batch_size * mega
+    batches = []
+    for s in range(0, len(idx), chunk):
+        part = sorted(idx[s : s + chunk], key=lambda i: lengths[i], reverse=True)
+        batches += [part[b : b + batch_size] for b in range(0, len(part), batch_size)]
+    rng.shuffle(batches)
+    return batches

@@ -57,3 +57,19 @@ def test_load_items_counts_match_the_dataset():
     assert sum(it["answer"] == "" for it in test) == 369          # unanswerable
     assert sum(it["answer"] != "" for it in test) == 1124         # answerable
     assert all((it["answer"] == "") == (not it["is_answerable"]) for it in test)
+
+
+def test_length_grouped_batches_cover_everything_and_group_by_length():
+    import random
+
+    from bangla_rag.t5_data import length_grouped_batches
+
+    lengths = [(i * 37) % 1000 for i in range(500)]
+    a = length_grouped_batches(lengths, 8, random.Random(7))
+    b = length_grouped_batches(lengths, 8, random.Random(7))
+    assert a == b                                               # deterministic for a seed
+    flat = [i for batch in a for i in batch]
+    assert sorted(flat) == list(range(500))                     # each example exactly once
+    assert all(len(batch) <= 8 for batch in a)
+    spread = sum(max(lengths[i] for i in bt) - min(lengths[i] for i in bt) for bt in a) / len(a)
+    assert spread < 150                                         # random batches would be ~700
