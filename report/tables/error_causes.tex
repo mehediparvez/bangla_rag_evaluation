@@ -1,0 +1,14 @@
+\begin{tabular}{lrrrr}
+\toprule
+Cause & \multicolumn{2}{c}{Gold passage ($n=40$)} & \multicolumn{2}{c}{BM25 ($n=40$)} \\
+\midrule
+acceptable wording & 31 & 78\% & 22 & 55\% \\
+partial answer & 7 & 18\% & 3 & 8\% \\
+wrong value & 0 & 0\% & 2 & 5\% \\
+false abstention & 2 & 5\% & 4 & 10\% \\
+retrieval miss & 0 & 0\% & 9 & 22\% \\
+\midrule
+Acceptable, strict (acceptable wording only) & \multicolumn{2}{c}{78\% [62, 88]} & \multicolumn{2}{c}{55\% [40, 69]} \\
+Acceptable, lenient (+ partial answer) & \multicolumn{2}{c}{95\% [83, 99]} & \multicolumn{2}{c}{62\% [47, 76]} \\
+\bottomrule
+\end{tabular}

@@ -4,7 +4,7 @@ A small language model cannot store many facts, so a question about a particular
 
 One trained model was tested on the 1,493 held-out questions, first with the correct passage and then with the top passage from each retriever. With the correct passage it reached an exact match of 59.9 and an F1 of 76.1, against 62.4 and 78.1 published for the same model type. It was slightly better than the published model on answerable questions and worse on unanswerable ones. On answerable questions, finding the passage with a retriever cost 4.1 exact-match points with BM25, 6.1 with the hybrid and 10.6 with dense retrieval, and the differences were statistically significant. Almost all of the loss came from questions for which the wrong passage was retrieved. Exact match also undercounts: with the correct passage 82\% of the answers reached an F1 of at least 0.5, while 56\% matched exactly. A small web page shows the system answering questions together with the passage it used.
 
-\todo{Add one sentence with the share of the hand-labelled wrong answers that were acceptable (Table~\ref{tab:errors}).}
+In a hand-labelled sample of 40 wrong answers given with the correct passage, 78\% differed from the reference only in wording and a further 18\% were partly right; none gave a wrong value.
 
 The study uses general Wikipedia text, one model size, one training run and a library of 3,000 passages, so the results describe this setting and need to be checked on other domains.
 

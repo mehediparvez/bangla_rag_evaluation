@@ -296,7 +296,9 @@ The counts above come from the program. To see the causes, I labelled 40 wrong a
 	\IfFileExists{tables/error_causes.tex}{\input{tables/error_causes.tex}}{\todo{run scripts/summarize\_errors.py on the labelled error\_sample.csv to create tables/error\_causes.tex}}
 \end{table}
 
-\todo{Write two or three sentences on Table~\ref{tab:errors}: what share of the gold errors is only wording, how the BM25 sample differs (retrieval misses), and which wrong answers were the most common kind.}
+In the gold sample 31 of the 40 answers (78\%) differed from the reference only in wording, and 7 more (18\%) were partly right, so 38 of 40 (95\%, interval 83--99\%) were right or nearly right. The other two were empty answers. None of the 40 was a wrong value or an unrelated piece of text. In the BM25 sample 9 answers (22\%) were retrieval misses, 22 (55\%) were wording differences, 3 were partial answers, 4 were empty answers and 2 were wrong values. Among the 31 BM25 errors where the right passage had been retrieved, 71\% were wording differences and 81\% were wording differences or partial answers.
+
+The labels agree with the automatic scores. The retrieval misses and empty answers all have an F1 of about 0, while the answers labelled as wording have a mean F1 of 0.59 (gold) and 0.63 (BM25). Thirteen of the wording answers had an F1 below 0.5, five of them exactly 0, and these were read again. Most differ only by a suffix on a word (a number with and without its counting suffix, a place name with and without a case ending), by the separator in a list, or by hidden characters, and the word-level F1 cannot see any of these. Two of the thirteen (\texttt{bn\_wiki\_0459\_03} and \texttt{bn\_wiki\_0955\_01}) are borderline. If they were counted as partial answers, the strict gold figure would fall from 78\% to 72.5\% and the lenient one would stay at 95\%.
 
 \section{The Demonstration Page}
 \label{sec:demo}
@@ -323,4 +325,4 @@ The model is also weaker at saying that it has no answer than the published one 
 
 Exact match underestimates the model. With the correct passage 56.0\% of answers match exactly, but 82.4\% have an F1 of at least 0.5, and in the examples I looked at most failures were a missing unit, an extra word or a suffix. Because of this I would not read the absolute exact-match figures as the share of questions the system really answers well. The comparison between retrievers does not depend on the choice, since the order and the significance are the same under exact match and under the relaxed match.
 
-\todo{Add one or two sentences from your labelled error sample (Table~\ref{tab:errors}) in your own words: how often a ``wrong'' answer was acceptable to you, and what the real mistakes looked like.}
+The hand-labelled sample points the same way. Of 40 wrong answers with the correct passage, 31 differed from the reference only in wording, 7 were partly right, 2 were empty and none was a wrong value. So with the correct passage most of the exact-match errors are not mistakes in the usual sense. With BM25, more than a fifth of the sampled errors were retrieval misses, and these are real failures that no kinder scoring would remove.
