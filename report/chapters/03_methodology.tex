@@ -6,6 +6,7 @@ Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, whic
 
 \begin{figure}[H]
 	\centering
+	\resizebox{\textwidth}{!}{%
 	\begin{tikzpicture}[
 		node distance=0.9cm,
 		box/.style={draw, rounded corners, align=center, minimum height=1.0cm, minimum width=2.4cm, font=\small},
@@ -22,7 +23,7 @@ Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, whic
 		\draw[arr] (m) -- (a);
 		\draw[arr] (lib) -- (r);
 		\draw[arr] (q) |- ([yshift=-0.35cm]m.south west) -- (m.south west);
-	\end{tikzpicture}
+	\end{tikzpicture}}
 	\caption{The question-answering pipeline. The question is used twice: to search the library and as part of the input to the reader.}
 	\label{fig:pipeline}
 \end{figure}
