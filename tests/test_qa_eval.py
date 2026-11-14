@@ -83,3 +83,14 @@ def test_load_passages_covers_all_3000_and_every_question_has_its_passage():
     passages = load_passages(DATA, normalize=ident)
     assert len(passages) == 3000
     assert all(it["passage_id"] in passages for it in load_items(DATA, "Test", normalize=ident))
+
+
+def test_contains_match_relaxed_rules():
+    from bangla_rag.qa_eval import contains_match
+
+    assert contains_match("বাঙালি নৃতত্ত্ববিদ মধুমালা চট্টোপাধ্যায়", "মধুমালা চট্টোপাধ্যায়") == 1   # extra words are fine
+    assert contains_match("২-৩", "২-৩ সেন্টিমিটার") == 0                                          # missing words are not
+    assert contains_match("ঢাকা।", "ঢাকা") == 1                                                   # the danda is ignored
+    assert contains_match("", "ঢাকা") == 0 and contains_match("ঢাকা", "") == 0 and contains_match("", "") == 1
+    assert contains_match("হাইফা বন্দর ; আশদোদ বন্দর ; ইয়ালাত বন্দর", "হাইফা বন্দর; আশদোদ বন্দর; ইয়ালাত বন্দর") == 1
+    assert contains_match("হাইফা বন্দর ; আশদোদ বন্দর", "হাইফা বন্দর; আশদোদ বন্দর; ইয়ালাত বন্দর") == 0   # a missing span

@@ -72,6 +72,20 @@ def score_item(prediction: str, gold: str, answer_type: str) -> tuple[int, float
     return compute_exact_match(prediction, gold), f1
 
 
+def contains_match(prediction: str, truth: str) -> int:
+    """Relaxed match: every ';'-separated reference span appears inside the prediction.
+
+    Both sides are normalised and the Bangla danda is ignored. An unanswerable question (empty reference)
+    is still correct only if the prediction is empty. This favours long answers, so it is a secondary measure.
+    """
+    squash = lambda s: normalize_text(s.replace("।", " "))
+    pred = squash(prediction)
+    spans = [s for s in (squash(x) for x in truth.split(";")) if s]
+    if not spans:
+        return int(pred == "")
+    return int(pred != "" and all(s in pred for s in spans))
+
+
 def _mean(xs: list[float]) -> float | None:
     return float(np.mean(xs)) if xs else None
 

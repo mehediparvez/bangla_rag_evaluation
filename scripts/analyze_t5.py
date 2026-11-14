@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 from bangla_rag.analysis import ClusterBootstrap, mcnemar_midp
-from bangla_rag.qa_eval import normalize_text
+from bangla_rag.qa_eval import contains_match, normalize_text
 from bangla_rag.stats import holm
 
 CONDITIONS = ["gold", "bm25", "dense", "hybrid", "none"]
@@ -43,8 +43,9 @@ def fmt(est, scale=100):
 
 def write_csv(path: Path, rows: list[dict]):
     if rows:
+        fields = list(dict.fromkeys(k for r in rows for k in r))  # rows may carry different columns
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0]))
+            w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
             w.writerows(rows)
 
@@ -75,17 +76,20 @@ def main():
         arr[c] = {
             "em": np.array([x["em"] for x in r], dtype=float),
             "f1": np.array([x["f1"] for x in r], dtype=float),
+            "f1ge50": np.array([float(x["f1"] >= 0.5) for x in r]),
+            "contains": np.array([float(contains_match(x["prediction"], x["reference"])) for x in r]),
             "empty": np.array([normalize_text(x["prediction"]) == "" for x in r], dtype=float),
             "hit": np.array([x["used_passage_id"] == x["gold_passage_id"] for x in r], dtype=float),
         }
 
     # ---- main table -------------------------------------------------------------------------
-    main_rows = []
+    main_rows, ests = [], {}
     print(f"\n{'condition':8s} {'HasAns EM':>20s} {'HasAns F1':>20s} {'NoAns EM':>20s} {'empty|ans':>20s} {'overall F1':>20s} {'hit@1':>8s}")
     for c in rows:
         a = arr[c]
         est = {
             "has_em": boot.mean_ci(a["em"], answerable), "has_f1": boot.mean_ci(a["f1"], answerable),
+            "has_f1ge50": boot.mean_ci(a["f1ge50"], answerable), "has_contains": boot.mean_ci(a["contains"], answerable),
             "no_em": boot.mean_ci(a["em"], ~answerable), "empty_on_ans": boot.mean_ci(a["empty"], answerable),
             "overall_em": boot.mean_ci(a["em"], everyone), "overall_f1": boot.mean_ci(a["f1"], everyone),
         }
@@ -96,7 +100,12 @@ def main():
         for k, (p, lo, hi) in est.items():
             row.update({k: round(100 * p, 2), k + "_lo": round(100 * lo, 2), k + "_hi": round(100 * hi, 2)})
         main_rows.append(row)
+        ests[c] = est
     write_csv(out / "analysis_main.csv", main_rows)
+    print("\nRelaxed matches on answerable questions (secondary; strict EM and F1 above stay the primary measures)")
+    print(f"{'condition':8s} {'F1 >= 0.5':>22s} {'reference contained':>22s}")
+    for c, est in ests.items():
+        print(f"{c:8s} {fmt(est['has_f1ge50']):>22s} {fmt(est['has_contains']):>22s}")
 
     # ---- paired comparisons between retrievers ------------------------------------------------
     pair_rows, pairs = [], [(a, b) for i, a in enumerate(RETRIEVERS) for b in RETRIEVERS[i + 1:] if a in rows and b in rows]
@@ -116,6 +125,19 @@ def main():
                               "p_raw": round(p, 5), "p_holm": round(adj[key], 5),
                               "em_diff": round(100 * d[0], 2), "em_diff_lo": round(100 * d[1], 2), "em_diff_hi": round(100 * d[2], 2),
                               "f1_diff": round(100 * f[0], 2), "f1_diff_lo": round(100 * f[1], 2), "f1_diff_hi": round(100 * f[2], 2)})
+    # robustness: does the retriever ranking depend on the metric? same paired test on the relaxed F1 >= 0.5 match
+    raw = {}
+    for a, b in pairs:
+        ca, cb = arr[a]["f1ge50"][answerable] == 1, arr[b]["f1ge50"][answerable] == 1
+        raw[f"{a} vs {b}"] = (a, b, int((ca & ~cb).sum()), int((~ca & cb).sum()))
+    adj = holm({k: mcnemar_midp(v[2], v[3]) for k, v in raw.items()})
+    print("\nPaired comparison on the relaxed match (F1 >= 0.5), HasAns: only-first / only-second, Holm-adjusted mid-p")
+    for key, (a, b, only_a, only_b) in raw.items():
+        d = boot.diff_ci(arr[a]["f1ge50"], arr[b]["f1ge50"], answerable)
+        print(f"  {key:16s} {only_a:4d} / {only_b:4d}   p_adj = {adj[key]:.4f}   accuracy diff {fmt(d)}")
+        pair_rows.append({"subset": "HasAns, F1>=0.5 match", "comparison": key, "only_first": only_a, "only_second": only_b,
+                          "p_holm": round(adj[key], 5), "relaxed_diff": round(100 * d[0], 2),
+                          "relaxed_diff_lo": round(100 * d[1], 2), "relaxed_diff_hi": round(100 * d[2], 2)})
     # descriptive: how much does each retriever lose against the correct passage? (not a test)
     print("\nLoss against the gold passage, HasAns EM / F1 (percentage points, descriptive)")
     for r in RETRIEVERS:
