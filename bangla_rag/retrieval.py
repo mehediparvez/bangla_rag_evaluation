@@ -65,13 +65,15 @@ class DenseRetriever:
         cache_dir: str | Path = "cache",
         batch_size: int = 32,
         device: str | None = None,
+        max_seq_length: int = 512,
     ):
         self.spec = EMBEDDERS[embedder]
         self.device = device
+        self.max_seq_length = max_seq_length
         self._model = None
         texts = [c["text"] for c in chunks]
         digest = hashlib.md5(
-            ("\n".join(texts) + self.spec["name"] + self.spec["passage_prefix"]).encode("utf-8")
+            ("\n".join(texts) + self.spec["name"] + self.spec["passage_prefix"] + str(max_seq_length)).encode("utf-8")
         ).hexdigest()[:12]
         cache_dir = Path(cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -95,7 +97,7 @@ class DenseRetriever:
             from sentence_transformers import SentenceTransformer
 
             self._model = SentenceTransformer(self.spec["name"], device=self.device)
-            self._model.max_seq_length = min(self._model.max_seq_length or 512, 512)
+            self._model.max_seq_length = min(self._model.max_seq_length or self.max_seq_length, self.max_seq_length)
         return self._model
 
     def _encode(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
