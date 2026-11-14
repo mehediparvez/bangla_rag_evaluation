@@ -23,7 +23,7 @@ from normalizer import normalize  # csebuetnlp/normalizer
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 from bangla_rag.qa_eval import summarise
-from bangla_rag.t5_data import load_items, load_passages
+from bangla_rag.t5_data import load_items, load_passages, question_key
 from bangla_rag.t5_infer import predict
 
 
@@ -65,7 +65,7 @@ def main():
         contexts = [""] * len(items)
     else:
         ranked = json.loads(Path(args.retrieved).read_text(encoding="utf-8"))
-        used_pid = [ranked[it["question_id"]][0] for it in items]
+        used_pid = [ranked[question_key(it["question_id"], it["question_raw"])][0] for it in items]
         contexts = [passages[p] for p in used_pid]
 
     t0 = time.time()
@@ -79,7 +79,8 @@ def main():
 
     with open(out / f"{name}_preds.jsonl", "w", encoding="utf-8") as f:
         for it, pred, sc, pid in zip(items, preds, result["per_item"], used_pid):
-            f.write(json.dumps({"question_id": it["question_id"], "question_type": it["question_type"],
+            f.write(json.dumps({"question_id": it["question_id"], "question": it["question_raw"],
+                                "question_type": it["question_type"],
                                 "answer_type": it["answer_type"], "gold_passage_id": it["passage_id"],
                                 "used_passage_id": pid, "reference": it["answer"], "prediction": pred,
                                 "em": sc["em"], "f1": sc["f1"], "answerable": sc["answerable"]},

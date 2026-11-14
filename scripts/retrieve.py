@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bangla_rag.data import build_corpus, sample_questions
 from bangla_rag.retrieval import BM25Retriever, DenseRetriever, HybridRetriever
+from bangla_rag.t5_data import question_key
 
 
 def main():
@@ -58,7 +59,7 @@ def main():
         for q in questions:
             hits = r.search(q["question"], args.depth)
             ids = [pids[i] for i, _ in hits]
-            ranked[q["question_id"]] = ids
+            ranked[question_key(q["question_id"], q["question"])] = ids
             ranks.append(ids.index(q["passage_id"]) + 1 if q["passage_id"] in ids else None)
         n = len(questions)
         at = lambda k: sum(1 for x in ranks if x is not None and x <= k) / n

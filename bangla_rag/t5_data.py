@@ -38,6 +38,7 @@ def load_items(data_dir: str | Path, split: str, normalize=None) -> list[dict]:
                     "question_id": qa["question_id"],
                     "passage_id": p["passage_id"],
                     "question": normalize(qa["question_text"]),
+                    "question_raw": qa["question_text"].strip(),
                     "context": gold_context,
                     "answer": normalize(ans["answer_text"][0]),
                     "answer_type": normalize(ans["answer_type"][0]),
@@ -46,6 +47,11 @@ def load_items(data_dir: str | Path, split: str, normalize=None) -> list[dict]:
                 }
             )
     return items
+
+
+def question_key(question_id: str, question_text: str) -> str:
+    """Unique key for a question. BanglaRQA reuses a few question ids (five in the Test split)."""
+    return f"{question_id}|{question_text.strip()}"
 
 
 def length_grouped_batches(lengths: list[int], batch_size: int, rng, mega: int = 50) -> list[list[int]]:
