@@ -13,7 +13,7 @@ def test_mcnemar_midp_is_exact_p_minus_half_the_point_probability():
     exact = binomtest(min(only_a, only_b), only_a + only_b, 0.5).pvalue
     assert mcnemar_midp(only_a, only_b) == pytest.approx(exact - binom.pmf(12, 42, 0.5))
     assert mcnemar_midp(only_a, only_b) < exact          # mid-p is less conservative than exact
-    assert mcnemar_midp(5, 5) == pytest.approx(1 - binom.pmf(5, 10, 0.5))   # tie: p just below 1
+    assert mcnemar_midp(5, 5) == pytest.approx(1.0)                          # a perfect tie gives p = 1
     assert mcnemar_midp(0, 0) == 1.0
     assert mcnemar_midp(30, 12) == mcnemar_midp(12, 30)                      # symmetric
 
