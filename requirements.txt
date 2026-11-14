@@ -6,3 +6,4 @@ faiss-cpu
 sentence-transformers>=3.0
 google-genai
 pytest
+scipy
