@@ -2,7 +2,7 @@
 
 \section{Overview}
 
-Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, which selects one passage from a library of 3,000 Bangla Wikipedia passages. The question and the passage are given together to the fine-tuned BanglaT5 model, which writes the answer. The model is trained once and is then used unchanged with every retriever, so any difference between conditions comes from the passage that is supplied.
+Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, which picks one passage out of a library of 3,000 Bangla Wikipedia passages. The question and that passage are then given together to the fine-tuned BanglaT5 model, which writes the answer. The model is trained once. After that it is used unchanged with every retriever, so any difference between two conditions comes from the passage it was given.
 
 \begin{figure}[H]
 	\centering
@@ -32,9 +32,9 @@ Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, whic
 
 \subsection{BanglaRQA}
 
-The system uses BanglaRQA \cite{ekram2022banglarqa}, released under the CC BY-NC-SA 4.0 licence. The dataset is downloaded at run time and is not included with the code. Each of its 3,000 Wikipedia passages comes with several questions. A question has a type (factoid, causal, confirmation or list), a flag saying whether it can be answered from the passage, and one or two reference answers. Answers are single spans, multiple spans separated by semicolons, or yes/no.
+The system uses BanglaRQA \cite{ekram2022banglarqa}, which is released under the CC BY-NC-SA 4.0 licence. The data is downloaded when the code runs and is not shipped with it. Each of the 3,000 Wikipedia passages comes with several questions. A question has a type (factoid, causal, confirmation or list), a flag that says whether the passage answers it, and one or two reference answers. An answer is a single span, several spans separated by semicolons, or a yes/no word.
 
-The authors' official split is used without change (Table~\ref{tab:split}). The splits are made by passage, so no passage appears in more than one of them.
+The official split is used as it is (Table~\ref{tab:split}). It is made by passage, so no passage appears in two splits. About a quarter of the questions in every split cannot be answered from their passage.
 
 \begin{table}[H]
 	\centering
@@ -44,46 +44,48 @@ The authors' official split is used without change (Table~\ref{tab:split}). The 
 		\toprule
 		Split & Passages & Questions & Unanswerable \\
 		\midrule
-		Train & 2,400 & 11,912 & \todo{count} \\
-		Validation & 300 & 1,484 & \todo{count} \\
-		Test & 300 & 1,493 & 369 \\
+		Train & 2,400 & 11,912 & 2,904 (24.4\%) \\
+		Validation & 300 & 1,484 & 358 (24.1\%) \\
+		Test & 300 & 1,493 & 369 (24.7\%) \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
+Five question ids are used twice in the test split. They belong to one passage, about the becquerel, which has ten questions attached; five of them are about the Shah Amanat Bridge and cannot be answered from that passage's text. Because of this, retrieval results are stored under the id together with the question text, and these five questions are left in the test set. They are 0.3\% of the questions.
+
 \subsection{Preprocessing}
 
-All text (question, passage and answer) is normalised with the \texttt{normalizer} package released by the BanglaT5 authors, as its documentation requires. The target for training is the first reference answer. For an unanswerable question the target is the empty string. When a question has several answers, only the first is used for training and for scoring, which is what the dataset authors do.
+Question, passage and answer are all normalised with the \texttt{normalizer} package from the BanglaT5 authors, as its documentation requires. The training target is the first reference answer. For an unanswerable question the target is the empty string. If a question has two reference answers, only the first is used for training and for scoring, which is what the dataset authors do.
 
-The median training input (question plus passage) has 293 tokens under the BanglaT5 tokenizer. The input limit is 1,024 tokens, and only 10 of the 11,912 training questions reach that limit and are truncated.
+For the BanglaT5 tokenizer the median input (question plus passage) is 293 tokens. The input limit is 1,024 tokens, and 10 of the 11,912 training inputs reach it and are cut.
 
 \section{The Reader: Fine-Tuned BanglaT5}
 
 \subsection{Model}
 
-The reader is BanglaT5 (\texttt{csebuetnlp/banglat5}) \cite{bhattacharjee2023banglat5}, an encoder-decoder Transformer with 12 encoder and 12 decoder layers and about 247 million parameters, built on the T5 architecture \cite{raffel2020t5}. The encoder reads the question and the passage together. The decoder writes the answer one token at a time.
+The reader is BanglaT5 (\texttt{csebuetnlp/banglat5}) \cite{bhattacharjee2023banglat5}, an encoder-decoder Transformer with 12 layers in each half and about 247 million parameters, built on the T5 design \cite{raffel2020t5}. The encoder reads the question and the passage together and the decoder writes the answer one token at a time.
 
 \subsection{Input and Output Format}
 
-The question and the passage are given to the tokenizer as a pair, question first, with the passage truncated if the pair exceeds 1,024 tokens. The target is the first normalised reference answer, at most 256 tokens. An unanswerable question has an empty target, so the model learns to produce nothing when the passage has no answer. This format follows the dataset authors' published training code \cite{ekram2022banglarqa}.
+The tokenizer receives the question and the passage as a pair, question first. If the pair is longer than 1,024 tokens the passage is cut, never the question. The target is the normalised first reference answer, at most 256 tokens. An unanswerable question has an empty target, so the model learns to write nothing when the passage has no answer. This follows the dataset authors' published training code \cite{ekram2022banglarqa}.
 
 \subsection{Training}
 
-The model is trained with the standard cross-entropy loss over the answer tokens. Batches are grouped by length so that short inputs are not padded to the length of long ones, which saves computation. Weights are kept in 32-bit precision and the forward pass runs in bfloat16, because T5-family models are known to overflow in 16-bit floating point. Table~\ref{tab:train-config} lists the settings.
+Training minimises the usual cross-entropy loss over the answer tokens. Examples of similar length are batched together so that short inputs are not padded up to the length of long ones. Weights are kept in 32-bit precision and the forward pass runs in bfloat16, because T5 models are known to overflow in 16-bit floating point. Table~\ref{tab:train-config} lists the settings.
 
 \begin{table}[H]
 	\centering
-	\caption{Training configuration. \todo{Confirm after the final run.}}
+	\caption{Training configuration.}
 	\label{tab:train-config}
 	\begin{tabular}{ll}
 		\toprule
 		Setting & Value \\
 		\midrule
 		Optimizer & AdamW, no weight decay \\
-		Learning rate & $1\times10^{-4}$, 5\% linear warmup then linear decay \\
+		Learning rate & $1\times10^{-4}$, 5\% linear warmup, then linear decay \\
 		Batch size & 8, with 2 accumulation steps (effective 16) \\
 		Gradient clipping & 1.0 \\
-		Epochs & 10 \\
+		Epochs & 10 (about 7,450 updates) \\
 		Precision & bfloat16 forward pass, fp32 weights \\
 		Maximum input / target length & 1,024 / 256 tokens \\
 		Random seed & 13 \\
@@ -92,29 +94,29 @@ The model is trained with the standard cross-entropy loss over the answer tokens
 	\end{tabular}
 \end{table}
 
-After every epoch the model is evaluated on the validation set, and the checkpoint with the best validation F1 is kept. The test set is not used for any choice. The dataset authors trained for 15 epochs with a batch size of 2 and a learning rate of $5\times10^{-5}$; this project uses a larger batch and a higher learning rate to shorten training, and checks the result against their published scores.
+After every epoch the model answers the whole validation set and the checkpoint with the best F1 is kept. The test set plays no part in any choice. The dataset authors trained for 15 epochs with batch size 2 and learning rate $5\times10^{-5}$, which is about 89,000 updates. I used a larger batch and a higher learning rate to finish in about 75 minutes, and then checked the result against their published scores.
 
 \section{Retrieval}
 
-\textbf{Library.} The library contains the 3,000 passages from all three splits, each kept whole with its identifier. Searching all of them, not only the test passages, makes retrieval harder and closer to real use. \todo{Confirm after the retrieval code is finished and tested.}
+\textbf{Library.} The library holds the 3,000 passages of all three splits, each kept whole under its identifier. Searching all of them, and not only the 300 test passages, makes the task harder and closer to real use.
 
-\textbf{BM25.} Text is lower-cased, punctuation including the Bangla danda is removed, and the result is split on whitespace. No stemmer or stop-word list is used. BM25 \cite{robertson2009bm25} is applied with its default parameters.
+\textbf{BM25.} The text is normalised to Unicode form NFC, Bangla digits become ASCII digits, punctuation (including the danda) is replaced by spaces, the text is lower-cased and split on spaces. There is no stemmer and no stop-word list. BM25 \cite{robertson2009bm25} then runs with the default parameters of the \texttt{rank\_bm25} package.
 
-\textbf{Dense retrieval.} The passages and the question are embedded with BGE-M3 \cite{chen2024bgem3}. Vectors are normalised, so the inner product equals the cosine similarity, and an exact (non-approximate) FAISS index \cite{johnson2019faiss} returns the nearest passages.
+\textbf{Dense retrieval.} Passages and questions are embedded with BGE-M3 \cite{chen2024bgem3}, with no instruction prefix, and passages are read up to 1,024 tokens. The vectors are normalised, so the inner product is the cosine similarity, and an exact FAISS index \cite{johnson2019faiss} returns the nearest passages.
 
-\textbf{Hybrid retrieval.} The BM25 and dense rankings are merged by reciprocal rank fusion \cite{cormack2009rrf}:
+\textbf{Hybrid retrieval.} The BM25 and dense rankings (50 passages deep) are merged by reciprocal rank fusion \cite{cormack2009rrf}:
 \begin{equation}
 	\mathrm{RRF}(d) = \sum_{r \in \{\text{BM25},\ \text{dense}\}} \frac{1}{k + \mathrm{rank}_r(d)}, \qquad k = 60,
 \end{equation}
-where $\mathrm{rank}_r(d)$ is the position of passage $d$ in ranking $r$.
+where $\mathrm{rank}_r(d)$ is the position of passage $d$ in ranking $r$. No retriever was tuned.
 
-In every retrieval condition the reader receives the single top-ranked passage. The match rate of the retriever is also reported on its own: hit@$n$ is the share of questions for which the question's own passage is among the top $n$ results ($n = 1$ and $n = 3$).
+In every retrieval condition the reader receives only the top-ranked passage. The retriever is also scored on its own. Hit@$n$ is the share of questions whose own passage is among the first $n$ results, and MRR is the mean of $1/\text{rank}$ of that passage in the first ten.
 
 \section{Evaluation}
 
 \subsection{Conditions}
 
-The same trained checkpoint is run on all 1,493 test questions under four conditions (Table~\ref{tab:conditions}). The first is an upper bound, and the others show how much is lost when the passage has to be found.
+The same checkpoint is run on all 1,493 test questions in the conditions of Table~\ref{tab:conditions}. The first is an upper bound. The next three show how much is lost when the passage has to be found. The last one has no passage at all and is only there to show how much the passage matters.
 
 \begin{table}[H]
 	\centering
@@ -128,32 +130,60 @@ The same trained checkpoint is run on all 1,493 test questions under four condit
 		BM25 & top-1 passage from BM25 \\
 		Dense & top-1 passage from BGE-M3 \\
 		Hybrid & top-1 passage from reciprocal rank fusion \\
+		None & no passage (the model was not trained for this) \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
 \subsection{Metrics}
 
-Scoring follows the dataset authors' evaluation code so that results can be compared with theirs. Answers are lower-cased, ASCII punctuation is removed and whitespace is collapsed. \textbf{Exact match (EM)} is 1 if the prediction equals the reference after this normalisation and 0 otherwise. \textbf{F1} is the harmonic mean of token-level precision $P$ and recall $R$,
+Scoring follows the dataset authors' evaluation code, so the gold condition can be compared with their published numbers. Answers are lower-cased, ASCII punctuation is removed and white space is collapsed. \textbf{Exact match (EM)} is 1 if prediction and reference are equal after this and 0 otherwise. \textbf{F1} is the harmonic mean of token precision $P$ and recall $R$,
 \begin{equation}
 	F_1 = \frac{2PR}{P + R},
 \end{equation}
-computed over whitespace-separated tokens. For answers with several spans, the spans are matched one-to-one to the reference spans by an assignment that maximises F1, and the score is averaged over the larger of the two span counts, so a missing span or an extra span lowers the score. For an unanswerable question the prediction is correct only if it is also empty.
+with tokens being the space-separated words. For answers with several spans the spans are paired with the reference spans by an assignment that maximises F1, and the score is averaged over the larger of the two span counts, so a missing and an extra span both lower it. For an unanswerable question the prediction is correct only if it is empty. The authors' normalisation keeps the Bangla danda, so a trailing danda makes a prediction differ from the reference.
 
-Because retrieval can change the passage but not the question, results are reported separately for answerable questions (HasAns) and unanswerable questions (NoAns). The NoAns score has to be read with care: when retrieval returns a wrong passage, a model that answers nothing is still counted correct on an unanswerable question. HasAns EM and F1 are therefore the primary measures for comparing retrievers. The rate at which the model gives an empty answer to an answerable question is also reported.
+Results are given separately for answerable questions (HasAns, 1,124 questions) and unanswerable ones (NoAns, 369). The two behave differently. When retrieval returns a wrong passage, a model that writes nothing is still right on an unanswerable question. NoAns scores therefore say more about how often the model abstains than about retrieval, and HasAns is the main measure when comparing retrievers. The share of answerable questions answered with an empty string is reported as well.
+
+Exact match is strict, and Bangla words carry suffixes, so I also report two relaxed matches on the answerable questions. They are secondary. One counts an answer as correct when its F1 is at least 0.5. The other counts it as correct when every reference span appears inside the prediction (after the same normalisation, with the danda ignored); this one favours long answers. The 0.5 cut-off is a common convention and not a standard. I chose it after noticing how far exact match falls below F1, and I did not try other cut-offs.
 
 \subsection{Statistical Analysis}
 
-All conditions are evaluated on the same questions, so comparisons are paired. For exact match, two conditions are compared with McNemar's test, using the mid-$p$ version \cite{fagerland2013mcnemar}. With $b$ questions that only the first condition answers correctly and $c$ that only the second does, the two-sided mid-$p$ value is
+All conditions are scored on the same questions, so comparisons are paired. For exact match, two retrievers are compared with McNemar's test in its mid-$p$ form \cite{fagerland2013mcnemar}. With $b$ questions that only the first retriever gets right and $c$ that only the second gets right, the two-sided mid-$p$ value is
 \begin{equation}
 	p = 2\sum_{i=0}^{m} \binom{b+c}{i}\,2^{-(b+c)} - \binom{b+c}{m}\,2^{-(b+c)}, \qquad m = \min(b, c).
 \end{equation}
-Confidence intervals for EM, F1 and for differences between conditions come from a paired bootstrap with 10,000 resamples \cite{efron1979bootstrap, berg2012empirical}. Because about five test questions share a passage, whole passages are resampled together and not single questions. The three comparisons between retrievers (BM25 against dense, BM25 against hybrid, dense against hybrid) are corrected with the Holm procedure \cite{holm1979simple}. General guidance on significance testing in NLP \cite{dror2018hitchhiker} informed these choices.
+Confidence intervals come from a paired bootstrap with 10,000 resamples \cite{efron1979bootstrap, berg2012empirical}. About five test questions share a passage, so the resampling draws whole passages and not single questions. The three comparisons between retrievers (BM25 with dense, BM25 with hybrid, dense with hybrid) are corrected with the Holm procedure \cite{holm1979simple}. These choices follow general advice on significance testing in NLP \cite{dror2018hitchhiker}.
 
 \subsection{Sanity Check Against Published Results}
 
-The gold condition is compared with the dataset authors' published test scores (EM 62.42, F1 78.11). A result close to these confirms that the training and scoring code are correct before the retrieval results are interpreted. Retrieval conditions have no published baseline.
+The gold condition is compared with the dataset authors' test scores for BanglaT5 (EM 62.42, F1 78.11). Before the experiments I decided that a result within about three points of these would count as a successful reproduction. The retrieval conditions have no published baseline.
 
 \subsection{Error Analysis}
 
-Wrong answers from the gold condition and from the best retrieval condition are sampled and assigned to a cause: retrieval miss (the correct passage was not returned), reader error (the passage was right but the answer wrong), or a surface mismatch (the answer is right in meaning but differs in wording, spelling or punctuation). Retrieval misses are identified automatically from passage identifiers. The other labels are assigned by hand by the author.
+From the gold condition and from the best retriever I drew 40 random answerable questions each whose exact match was 0 (80 in all). Each was labelled by hand with one cause (Table~\ref{tab:causes}). Retrieval misses and empty answers are labelled by the script from the passage identifiers and the prediction. The rest were labelled by me, from the reference, the prediction and the passage, so it is the judgement of one person. Two figures are reported: a strict one that counts only \emph{acceptable wording} as acceptable, and a lenient one that adds \emph{partial answer}.
+
+\begin{table}[H]
+	\centering
+	\caption{Causes used to label wrong answers.}
+	\label{tab:causes}
+	\small
+	\begin{tabular}{lp{10.5cm}}
+		\toprule
+		Cause & Meaning \\
+		\midrule
+		acceptable wording & right meaning, different wording: extra or missing words, a suffix, another list separator \\
+		partial answer & correct as far as it goes, but a required part is missing \\
+		wrong value & the right kind of answer, but the wrong entity, number or date \\
+		unrelated span & text from the passage that does not answer the question \\
+		yes/no flipped & a confirmation question answered with the opposite word \\
+		false abstention & empty answer although the passage contains the answer \\
+		retrieval miss & the wrong passage was retrieved \\
+		dataset issue & the reference is wrong or ambiguous, or the answer is not in the passage \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\section{Demonstration Interface}
+
+To show the system working, the retriever and the reader are wrapped in a small web page built with Gradio. The user types a Bangla question and picks BM25, dense or hybrid retrieval. The page shows the answer, the passage the model read, and the three best passages with their scores. When the model writes nothing, the page says that no answer was found in the retrieved passage. It runs inside the Colab notebook and is not published on the web.

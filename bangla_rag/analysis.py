@@ -56,3 +56,14 @@ class ClusterBootstrap:
         draws = self._draws(values_a, mask) - self._draws(values_b, mask)
         lo, hi = np.percentile(draws, self.q)
         return float(point), float(lo), float(hi)
+
+
+def wilson_interval(k: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
+    """(proportion, low, high): Wilson score interval for k successes out of n, for small hand-labelled samples."""
+    if n == 0:
+        return float("nan"), float("nan"), float("nan")
+    p = k / n
+    denom = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return float(p), float(centre - half), float(centre + half)

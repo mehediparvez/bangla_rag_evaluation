@@ -2,28 +2,33 @@
 
 \section{Conclusion}
 
-\todo{Write after the results are final. Cover: what was built (a fine-tuned BanglaT5 reader with three retrievers); the gold-passage result against the published 62.42 / 78.11; how much accuracy is lost with retrieved passages; which retriever lost least and whether the difference is reliable; how the model handled unanswerable questions; and the main source of remaining errors.}
+I built a Bangla question-answering system out of open parts. BanglaT5 was fine-tuned on BanglaRQA to read a passage and answer, or to write nothing when the passage has no answer, and three retrievers (BM25, BGE-M3 dense retrieval and a hybrid of the two) search a library of 3,000 Wikipedia passages for it. The system was tested on 1,493 questions it had not seen, and a small web page shows it at work.
+
+With the correct passage the model scored an exact match of 59.9 and an F1 of 76.1, which is within 2.5 points of the published figures for BanglaT5. It was slightly better on answerable questions and clearly worse on unanswerable ones (71.5\% against 85.4\%). When the passage came from a retriever instead, accuracy on answerable questions fell by 4.1 exact-match points with BM25, by 6.1 with the hybrid and by 10.6 with dense retrieval. BM25 was the best of the three and dense retrieval the worst, and all three differences were statistically significant. This is the opposite of what published results on other Bengali data would lead one to expect, and I did not find out why.
+
+The loss comes almost entirely from retrieval misses. When the right passage was retrieved, the reader scored about the same with every retriever (57\% exact match). When it was not, the score dropped to 8--12\% and more than half of the answers were empty. Exact match also hides how good the answers are: with the correct passage 56\% match exactly, but 82\% reach an F1 of 0.5. \todo{Add one sentence about your hand-labelled sample: the share of wrong answers you judged acceptable.}
 
 \section{Limitations}
 
 \begin{itemize}
-	\item \textbf{One dataset and domain.} All passages are general-domain Bangla Wikipedia, and the questions were written from those passages. Results may not carry over to other domains, or to questions that were not written with a passage in mind.
-	\item \textbf{One model and one training run.} The reader was fine-tuned once with a single random seed. The confidence intervals reflect the sampling of test questions only, not variation between training runs.
-	\item \textbf{Training on correct passages only.} The model never saw a wrong passage during training, so its behaviour on retrieval misses is not controlled.
-	\item \textbf{Abstention is confounded with retrieval.} A model that answers nothing is correct on unanswerable questions even if the passage it received is wrong, so NoAns scores say little about retrieval quality.
-	\item \textbf{Scoring follows the dataset authors.} Only the first reference answer is used, and the Bangla danda is not removed in scoring, so correct answers with different punctuation are counted wrong.
-	\item \textbf{Correlated test questions.} About five questions come from each passage, so they are not independent. Passage-level resampling accounts for this in the intervals but reduces the effective sample size.
-	\item \textbf{Single annotator.} The error causes were labelled by one person.
-	\item \textbf{Compute.} The recipe was shortened for a single GPU and may be below the best possible score for this model.
+	\item The data is general Wikipedia text, and the questions were written by looking at the passage. Results may differ for other domains and for questions asked without a passage in mind.
+	\item The reader was trained once with one random seed. The intervals in this report cover the sampling of test questions but not the variation between training runs.
+	\item The model was trained only on correct passages. It has never seen a passage that is wrong but looks relevant, so its behaviour after a retrieval miss was not trained.
+	\item On unanswerable questions an empty answer is right whichever passage was retrieved, so those scores mostly measure how often the model abstains, not how good retrieval is.
+	\item Scoring follows the dataset authors: only the first reference answer is used, and the danda is not removed, so some correct answers are counted wrong. The relaxed matches are common conventions and not standards.
+	\item The retrievers were used as published and were not tuned, and I did not test why dense retrieval performed worst.
+	\item The error causes were labelled by one person (the author), on 40 answers per condition.
+	\item Training was shortened to about 7,450 updates to fit one GPU. The published model made about 89,000, and my model's gap on unanswerable questions may be due to this.
+	\item Five test question ids are reused in the dataset, and their questions do not belong together. They are 0.3\% of the test set.
 \end{itemize}
 
 \section{Future Work}
 
 \begin{itemize}
-	\item Train the reader on retrieved passages, including wrong ones labelled as unanswerable, so that it learns to abstain when retrieval fails.
-	\item Retrieve smaller chunks, or several passages, and study how many the reader should receive.
-	\item Add a second embedding model and a re-ranking step, and test other chunk sizes.
-	\item Repeat the study in a specialised domain such as health or education, with a larger document collection.
-	\item Train with several random seeds to measure variation between runs.
-	\item Evaluate the answers with human judges in addition to string-matching metrics.
+	\item Train the reader on retrieved passages as well, and label the wrong ones as unanswerable, so that it learns to say nothing when retrieval fails.
+	\item Give the reader several passages, or smaller chunks, instead of one whole passage. The hybrid retriever, which was best at rank 10, would be most useful there.
+	\item Find out why dense retrieval did worse than BM25, for example by tuning it or by comparing it with other embedding models.
+	\item Train longer, with several seeds, to see how much of the gap on unanswerable questions is training length.
+	\item Repeat the study on a specialised domain with a larger library, such as health or education texts.
+	\item Add human judges, so that answers are not scored only by comparison with one reference string.
 \end{itemize}

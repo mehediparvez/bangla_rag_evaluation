@@ -55,3 +55,13 @@ def test_cluster_bootstrap_is_wider_when_questions_in_a_passage_agree():
 
 def test_question_key_separates_reused_ids():
     assert question_key("bn_wiki_0059_01", " বেকেরেল কী? ") != question_key("bn_wiki_0059_01", "শাহ আমানত সেতু কোথায়?")
+
+
+def test_wilson_interval_matches_hand_values():
+    from bangla_rag.analysis import wilson_interval
+
+    p, lo, hi = wilson_interval(36, 40)                      # 90% of 40
+    assert p == pytest.approx(0.9) and lo == pytest.approx(0.769, abs=0.002) and hi == pytest.approx(0.960, abs=0.002)
+    assert wilson_interval(0, 40)[1] == pytest.approx(0.0, abs=1e-9)   # lower bound never goes below 0
+    assert wilson_interval(40, 40)[2] <= 1.0
+    assert wilson_interval(0, 0)[0] != wilson_interval(0, 0)[0]       # nan for an empty sample

@@ -2,132 +2,341 @@
 
 \section{Introduction}
 
-This chapter describes the experimental setup and reports the training results, the retrieval results and the end-to-end answer accuracy. Every number marked as a to-do is filled in from the final runs; the numbers in the text must always agree with the tables.
+This chapter reports what happened when the system was trained and tested. Section~\ref{sec:setup} describes the setup and Section~\ref{sec:training} the training. Section~\ref{sec:gold} gives the result with the correct passage, Section~\ref{sec:retrieval} the retrievers on their own and Section~\ref{sec:e2e} the full system. Section~\ref{sec:relaxed} looks at how much exact match undercounts, Section~\ref{sec:errors} at the errors by hand, and Section~\ref{sec:demo} shows the demonstration page. The discussion is in Section~\ref{sec:discussion}.
 
 \section{Experimental Setup}
+\label{sec:setup}
 
 \subsection{Computational Environment}
 
-All training and evaluation ran on Google Colab with one NVIDIA L4 GPU (about 23 GB of memory). Training used the Hugging Face Transformers library with PyTorch. \todo{Add exact versions of Python, PyTorch, Transformers, sentence-transformers, FAISS and rank\_bm25 from the saved config.json.} The code, the training configuration and the per-question predictions are saved so that every number can be recomputed.
+Everything ran on Google Colab with one NVIDIA L4 GPU (about 23 GB of memory). The software was Python 3.13, PyTorch 2.14.1, Transformers 5.22.1, sentence-transformers 5.7.0, faiss-cpu 1.16.0, rank\_bm25 0.2.2, SciPy 1.16.3, NumPy 2.4.6 and, for the demonstration page, Gradio 6.31.0. The code, the training configuration and the per-question predictions are saved, so every number below can be recomputed from them.
 
 \subsection{Implementation Details}
 
-The fine-tuning script reads the BanglaRQA training set, builds the question--passage inputs described in Chapter~3, and trains with the configuration in Table~\ref{tab:train-config}. A short test run of 150 optimizer steps compared bfloat16 with 32-bit precision before the full run: the mean loss was 14.24 in bfloat16 and 14.25 in fp32, with no overflow, and bfloat16 used less memory (14.4 GiB against 17.9 GiB) at the same speed (about 28 examples per second). The full run therefore used bfloat16.
+Before the full run I trained for 150 steps twice, once in bfloat16 and once in 32-bit precision. The mean loss was 14.24 and 14.25, neither run overflowed, and bfloat16 used less memory (14.4 GiB against 17.9 GiB) at the same speed (about 28 examples per second), so the full run used bfloat16. The full run processed about 29 examples per second. One epoch took between 405 and 411 seconds of training plus 17 to 57 seconds of validation, so the ten epochs took about 76 minutes. Scoring all 1,493 test questions in one condition took under a minute (54 seconds for the gold condition). Searching the library for all test questions took 11 seconds with BM25, 49 seconds with dense retrieval and 44 seconds with the hybrid, after the passage embeddings had been computed once.
 
 \section{Training Results}
+\label{sec:training}
 
-\subsection{Training and Validation Curves}
+Table~\ref{tab:epochs} gives the loss and the validation scores after each epoch, and Figure~\ref{fig:curve} plots them. The validation set has 1,484 questions, 358 of them unanswerable.
 
-Figure~\ref{fig:curve} shows the training loss and the validation F1 after each epoch. In the first epoch the model produced an empty answer for every validation question, which scores 24.1\% because that is the share of unanswerable questions; in the second epoch it began answering real questions (validation F1 rose from 0.241 to 0.457, and answerable EM from 0 to 0.224). \todo{Describe the later epochs, where the curve flattens, and which epoch was selected.}
+\begin{table}[H]
+	\centering
+	\caption{Training loss and validation scores per epoch (validation set, \%). Ans.\ EM and Unans.\ EM are exact match on the answerable and unanswerable questions.}
+	\label{tab:epochs}
+	\begin{tabular}{rrrrrr}
+		\toprule
+		Epoch & Train loss & EM & F1 & Ans.\ EM & Unans.\ EM \\
+		\midrule
+		1 & 6.080 & 24.1 & 24.1 & 0.0 & 100.0 \\
+		2 & 1.823 & 36.8 & 45.7 & 22.4 & 82.1 \\
+		3 & 1.148 & 50.1 & 66.4 & 47.6 & 57.8 \\
+		4 & 0.813 & 50.9 & 68.3 & 49.9 & 53.9 \\
+		5 & 0.679 & 53.9 & 70.6 & 51.9 & 60.3 \\
+		6 & 0.605 & 55.0 & 72.5 & 54.1 & 57.8 \\
+		7 & 0.541 & 57.8 & 74.9 & 55.6 & 64.8 \\
+		8 & 0.499 & 58.1 & 74.7 & 56.3 & 63.7 \\
+		9 & 0.463 & \textbf{59.1} & \textbf{76.0} & 56.3 & 67.9 \\
+		10 & 0.454 & 59.1 & 75.7 & 56.8 & 66.2 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
 \begin{figure}[H]
 	\centering
-	\IfFileExists{figures/training_curve.png}{\includegraphics[width=0.8\textwidth]{figures/training_curve.png}}{\todo{copy training\_curve.png from the Drive run folder into report/figures/}}
-	\caption{Training loss and validation F1 per epoch.}
+	\IfFileExists{figures/training_curve.png}{\includegraphics[width=\textwidth]{figures/training_curve.png}}{\todo{figures/training\_curve.png is missing; run make\_figures.py}}
+	\caption{Training loss (left) and validation F1 and exact match (right) after each epoch. The dashed line marks the checkpoint that was kept.}
 	\label{fig:curve}
 \end{figure}
 
-\subsection{Selected Checkpoint}
+After the first epoch the model answered every validation question with an empty string. That scores 24.1\%, which is exactly the share of unanswerable questions in the validation set, and it shows that at this point the model had learned nothing except that empty is the most common target. From the second epoch it started to produce real answers. Validation F1 reached 76.0 at epoch 9 and dropped slightly to 75.7 at epoch 10 while the training loss kept falling. I kept the epoch 9 checkpoint (validation EM 59.1, F1 76.0). Between epochs 7 and 10 the F1 moves within 1.3 points, which is about the size of the sampling error on 1,484 questions, so the flat end of the curve should not be over-read.
 
-\todo{State the epoch with the best validation F1 and its validation EM and F1. Training time per epoch was about 7.5 minutes.}
+\section{Results with the Correct Passage}
+\label{sec:gold}
 
-\section{Gold-Passage Results and Comparison with the Published Scores}
+Table~\ref{tab:gold} compares the gold condition with the scores published by the dataset authors, and Table~\ref{tab:types} breaks it down by question and answer type.
 
 \begin{table}[H]
 	\centering
-	\caption{Test results with the correct passage supplied, compared with the dataset authors' published BanglaT5 scores.}
+	\caption{Test results with the correct passage (1,493 questions), against the dataset authors' published BanglaT5 scores (EM / F1, \%).}
 	\label{tab:gold}
-	\begin{tabular}{lcccc}
+	\begin{tabular}{lrr}
 		\toprule
-		 & \multicolumn{2}{c}{Overall} & \multicolumn{2}{c}{Answerable} \\
-		System & EM & F1 & EM & F1 \\
+		 & Published (Ekram et al.) & This project \\
 		\midrule
-		Published (Ekram et al.) & 62.42 & 78.11 & 54.89 & 75.73 \\
-		This project & \todo{} & \todo{} & \todo{} & \todo{} \\
+		All questions & 62.42 / 78.11 & 59.88 / 76.11 \\
+		Answerable (1,124) & 54.89 / 75.73 & 56.05 / 77.61 \\
+		Unanswerable (369) & 85.37 & 71.54 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
-\todo{Discuss the gap to the published scores and what could explain it (fewer optimizer steps, larger batch, higher learning rate, one seed). State whether the sanity check passed.}
+Over all questions the model is 2.5 EM points and 2.0 F1 points below the published scores. That is inside the three-point margin I set in advance for a successful reproduction. With 1,493 questions the sampling error of an EM near 0.6 is about 1.3 points, so a gap of this size is about two standard errors.
+
+The gap comes entirely from the unanswerable questions. On answerable questions the model is slightly better than the published numbers (56.05 against 54.89 EM, 77.61 against 75.73 F1). On unanswerable questions it is right 71.5\% of the time against 85.4\%, which means it writes an answer to about 28\% of the questions that have none. Weighting the three differences by the share of each group gives back the overall gap. The model made about 7,450 updates against roughly 89,000 for the published run, and its validation score on unanswerable questions had climbed from 53.9 at epoch 4 to 67.9 at epoch 9 (66.2 at epoch 10). That fits the idea that more training would close the gap, but I did not run a longer training to test it.
+
+\begin{table}[H]
+	\centering
+	\caption{Gold-passage test results by type (EM / F1, \%), with the published figures in brackets. Answer types cover answerable questions only.}
+	\label{tab:types}
+	\small
+	\begin{tabular}{llrr}
+		\toprule
+		 & Type & $n$ & This project (published) \\
+		\midrule
+		Question type & factoid & 1,036 & 63.4 / 78.4 (65.6 / 80.3) \\
+		 & causal & 157 & 50.3 / 71.5 (49.7 / 69.4) \\
+		 & confirmation & 136 & 77.2 / 77.2 (86.8 / 86.8) \\
+		 & list & 164 & 32.3 / 65.5 (34.1 / 65.2) \\
+		\midrule
+		Answer type & single span & 855 & 58.3 / 80.0 (56.7 / 77.8) \\
+		 & multiple spans & 154 & 23.4 / 60.1 (20.8 / 55.8) \\
+		 & yes/no & 115 & 83.5 / 83.5 (87.0 / 87.0) \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+The pattern across types is the same as in the published results. Yes/no and confirmation questions are the easiest, and list questions with several spans are by far the hardest, with an EM of 23 to 32\% but an F1 of 60 to 66\%. A list answer gets no exact match if one item is missing or the separators differ.
 
 \section{Retrieval Results}
+\label{sec:retrieval}
+
+Table~\ref{tab:hit} and Figure~\ref{fig:hits} show how often each retriever finds the question's own passage, over all 1,493 test questions.
 
 \begin{table}[H]
 	\centering
-	\caption{Share of test questions for which the question's own passage is among the top $n$ retrieved passages.}
+	\caption{Share of test questions whose own passage is among the first $n$ results (\%), and mean reciprocal rank.}
 	\label{tab:hit}
+	\begin{tabular}{lrrrr}
+		\toprule
+		Retriever & Hit@1 & Hit@3 & Hit@10 & MRR \\
+		\midrule
+		BM25 & 77.9 & 87.9 & 91.3 & 0.830 \\
+		Dense (BGE-M3) & 69.4 & 82.5 & 88.9 & 0.767 \\
+		Hybrid (RRF) & 74.8 & 87.9 & 94.1 & 0.819 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+	\centering
+	\IfFileExists{figures/retrieval_hits.png}{\includegraphics[width=0.8\textwidth]{figures/retrieval_hits.png}}{\todo{figures/retrieval\_hits.png is missing}}
+	\caption{Retrieval hit rates on the 1,493 test questions.}
+	\label{fig:hits}
+\end{figure}
+
+BM25 puts the right passage first most often (77.9\%), dense retrieval least often (69.4\%), and the hybrid lies between them. The picture changes further down the list. At rank 3 BM25 and the hybrid are level at 87.9\%, and at rank 10 the hybrid is best with 94.1\%. In other words, for about one question in five the first result of the best retriever is not the passage that holds the answer.
+
+\section{End-to-End Results}
+\label{sec:e2e}
+
+Tables~\ref{tab:has} and \ref{tab:no} give the scores of every condition, with 95\% bootstrap intervals that resample whole passages. The main comparison is on the 1,124 answerable questions, for the reason given in Chapter~3.
+
+\begin{table}[H]
+	\centering
+	\caption{Answerable questions (HasAns, $n=1{,}124$): exact match and F1 in \%, with 95\% intervals.}
+	\label{tab:has}
+	\small
 	\begin{tabular}{lcc}
 		\toprule
-		Retriever & Hit@1 & Hit@3 \\
+		Condition & EM & F1 \\
 		\midrule
-		BM25 & \todo{} & \todo{} \\
-		Dense (BGE-M3) & \todo{} & \todo{} \\
-		Hybrid (RRF) & \todo{} & \todo{} \\
+		Gold passage & 56.0 [52.9, 59.3] & 77.6 [75.5, 79.7] \\
+		BM25 & 52.0 [48.9, 55.2] & 71.6 [69.0, 74.1] \\
+		Hybrid & 49.9 [46.9, 53.0] & 69.2 [66.8, 71.6] \\
+		Dense & 45.5 [42.4, 48.5] & 63.6 [60.9, 66.3] \\
+		No passage & 2.0 [1.2, 3.0] & 2.1 [1.2, 3.0] \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
-\section{End-to-End Answer Accuracy}
-
 \begin{table}[H]
 	\centering
-	\caption{Test results for each condition, with 95\% bootstrap confidence intervals. HasAns: answerable questions ($n=1{,}124$). NoAns: unanswerable questions ($n=369$). Empty rate: share of answerable questions answered with an empty string.}
-	\label{tab:main}
-	\begin{tabular}{lccccc}
+	\caption{Unanswerable questions (NoAns, $n=369$), the share of answerable questions answered with an empty string, and F1 over all questions (\%, with 95\% intervals).}
+	\label{tab:no}
+	\small
+	\begin{tabular}{lccc}
 		\toprule
-		Condition & HasAns EM & HasAns F1 & NoAns EM & Empty rate & Overall F1 \\
+		Condition & NoAns EM & Empty on answerable & F1, all questions \\
 		\midrule
-		Gold & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
-		BM25 & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
-		Dense & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
-		Hybrid & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Gold passage & 71.5 [66.8, 76.2] & 2.4 [1.4, 3.5] & 76.1 [74.1, 78.2] \\
+		BM25 & 54.2 [48.8, 59.5] & 8.2 [6.4, 10.1] & 67.3 [65.0, 69.6] \\
+		Hybrid & 55.3 [49.9, 60.6] & 10.2 [8.4, 12.2] & 65.8 [63.3, 68.2] \\
+		Dense & 62.6 [57.5, 67.7] & 15.8 [13.6, 18.1] & 63.4 [60.9, 65.9] \\
+		No passage & 98.1 [96.6, 99.4] & 96.6 [95.5, 97.7] & 25.8 [24.5, 27.1] \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
+\begin{figure}[H]
+	\centering
+	\IfFileExists{figures/endtoend.png}{\includegraphics[width=0.95\textwidth]{figures/endtoend.png}}{\todo{figures/endtoend.png is missing}}
+	\caption{Accuracy on answerable questions with 95\% intervals: exact match, F1, and the share of answers with F1 of at least 0.5.}
+	\label{fig:e2e}
+\end{figure}
+
+Against the correct passage, BM25 loses 4.1 EM points on answerable questions [2.7, 5.6], the hybrid 6.1 [4.5, 7.9] and dense retrieval 10.6 [8.5, 12.9]. In F1 the losses are 6.0, 8.4 and 14.0 points. The retrievers are ordered BM25, hybrid, dense, and Table~\ref{tab:pairs} shows that the order is not a matter of chance.
+
 \begin{table}[H]
 	\centering
-	\caption{Paired comparisons of exact match between retrievers (mid-$p$ McNemar, Holm-adjusted).}
-	\label{tab:mcnemar}
-	\begin{tabular}{lcccc}
+	\caption{Paired comparisons between retrievers. Only 1st / only 2nd: questions that only the first or only the second retriever answers correctly. $p$ is the mid-$p$ McNemar value after Holm correction. The difference is first minus second, in percentage points, with a 95\% interval.}
+	\label{tab:pairs}
+	\small
+	\begin{tabular}{llrrcc}
 		\toprule
-		Comparison & Only first correct & Only second correct & Adjusted $p$ & EM difference \\
+		Measure & Comparison & Only 1st & Only 2nd & $p$ & Difference \\
 		\midrule
-		BM25 vs dense & \todo{} & \todo{} & \todo{} & \todo{} \\
-		BM25 vs hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
-		Dense vs hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
+		HasAns EM & BM25 vs dense & 103 & 30 & $<0.0001$ & 6.5 [4.3, 8.8] \\
+		 & BM25 vs hybrid & 49 & 26 & 0.008 & 2.0 [0.4, 3.8] \\
+		 & dense vs hybrid & 10 & 60 & $<0.0001$ & $-4.4$ [$-5.9$, $-3.0$] \\
+		\midrule
+		HasAns, F1 $\ge 0.5$ & BM25 vs dense & 142 & 53 & $<0.0001$ & 7.9 [5.3, 10.6] \\
+		 & BM25 vs hybrid & 68 & 40 & 0.007 & 2.5 [0.4, 4.5] \\
+		 & dense vs hybrid & 20 & 81 & $<0.0001$ & $-5.4$ [$-7.1$, $-3.7$] \\
+		\midrule
+		All questions, EM & BM25 vs dense & 128 & 86 & 0.012 & 2.8 [0.8, 4.8] \\
+		 & BM25 vs hybrid & 73 & 54 & 0.093 & 1.3 [$-0.4$, 2.9] \\
+		 & dense vs hybrid & 46 & 69 & 0.065 & $-1.5$ [$-2.9$, $-0.1$] \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
+On answerable questions all three differences are significant, and they come out the same way whether the score is exact match or the relaxed F1 $\ge 0.5$ match. When the unanswerable questions are mixed in, only BM25 against dense stays significant. That is expected, because on unanswerable questions an empty answer is correct whichever passage was found. It is also why dense retrieval has the best NoAns score of the three (62.6) while being the worst retriever: it makes the model abstain more often (15.8\% of answerable questions get an empty answer), and an abstaining model is right on every unanswerable question.
+
 \begin{table}[H]
 	\centering
-	\caption{HasAns results split by whether retrieval returned the correct passage.}
+	\caption{Answerable questions split by whether the retriever returned the right passage (EM and F1 in \%, and the share of empty answers).}
 	\label{tab:hitmiss}
-	\begin{tabular}{lcccc}
+	\small
+	\begin{tabular}{lrrrrrrrr}
 		\toprule
-		 & \multicolumn{2}{c}{Correct passage retrieved} & \multicolumn{2}{c}{Wrong passage retrieved} \\
-		Retriever & $n$ & EM & $n$ & EM \\
+		 & \multicolumn{4}{c}{Right passage} & \multicolumn{4}{c}{Wrong passage} \\
+		\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+		Retriever & $n$ & EM & F1 & Empty & $n$ & EM & F1 & Empty \\
 		\midrule
-		BM25 & \todo{} & \todo{} & \todo{} & \todo{} \\
-		Dense & \todo{} & \todo{} & \todo{} & \todo{} \\
-		Hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
+		BM25 & 987 & 57.5 & 78.6 & 1.9 & 137 & 11.7 & 20.9 & 53.3 \\
+		Dense & 867 & 56.6 & 78.8 & 2.0 & 257 & 7.8 & 12.4 & 62.6 \\
+		Hybrid & 944 & 57.1 & 78.8 & 1.7 & 180 & 12.2 & 18.7 & 55.0 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
-\section{Breakdown by Question Type}
+\begin{figure}[H]
+	\centering
+	\IfFileExists{figures/hit_vs_miss.png}{\includegraphics[width=0.8\textwidth]{figures/hit_vs_miss.png}}{\todo{figures/hit\_vs\_miss.png is missing}}
+	\caption{Exact match on answerable questions when the retriever returned the right passage and when it did not.}
+	\label{fig:hitmiss}
+\end{figure}
 
-\todo{Table of EM and F1 for factoid, causal, confirmation and list questions, and for single-span, multiple-span and yes/no answers, for the gold condition at least.}
+Table~\ref{tab:hitmiss} explains most of the differences between the retrievers. When the right passage is returned, the reader scores about 57\% EM and 79\% F1 with all three retrievers. When a wrong passage is returned, EM falls to 8--12\% and more than half of the answers are empty. So the retrievers differ mainly in how many questions they send into the second group: 137 answerable questions for BM25, 180 for the hybrid and 257 for dense retrieval. These two groups are not matched samples, because questions whose passage is easy to find may also be easier to read, so the 57\% in the right-passage group is not exactly comparable with the gold row of Table~\ref{tab:has}.
 
-\section{Error Analysis}
+Without any passage the model answers almost nothing (2.0\% EM on answerable questions), and 96.6\% of its answers are empty. So the reader holds almost no knowledge of its own, and what it knows comes from the passage.
 
-\todo{Table of error causes (retrieval miss, reader error, surface mismatch) for the sampled wrong answers, with two or three example questions in Bangla and the model's answers.}
+\section{How Much Does Exact Match Undercount?}
+\label{sec:relaxed}
 
-\section{Sample Input and Output}
+Exact match is strict, and Table~\ref{tab:relaxed} shows what the two relaxed matches give for the same answers. With the correct passage, exact match counts 56.0\% of the answerable questions as right, while 82.4\% reach an F1 of 0.5 or more. The order of the conditions does not change under either relaxed match.
 
-\todo{Two or three examples: question, retrieved passage, model answer, reference answer. Include one unanswerable question and one retrieval failure.}
+\begin{table}[H]
+	\centering
+	\caption{Answerable questions counted as correct under three rules (\%, with 95\% intervals).}
+	\label{tab:relaxed}
+	\small
+	\begin{tabular}{lccc}
+		\toprule
+		Condition & Exact match & F1 $\ge 0.5$ & Reference contained \\
+		\midrule
+		Gold passage & 56.0 [52.9, 59.3] & 82.4 [79.9, 84.8] & 70.2 [67.3, 73.2] \\
+		BM25 & 52.0 [48.9, 55.2] & 75.9 [73.0, 78.7] & 65.1 [62.2, 68.3] \\
+		Hybrid & 49.9 [46.9, 53.0] & 73.4 [70.6, 76.1] & 62.8 [59.9, 65.9] \\
+		Dense & 45.5 [42.4, 48.5] & 68.0 [64.9, 71.1] & 57.3 [54.2, 60.5] \\
+		No passage & 2.0 [1.2, 3.0] & 2.0 [1.2, 3.0] & 2.0 [1.2, 3.0] \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+To see what the failures look like, I took all answerable questions where the right passage was retrieved but exact match was 0, and counted how close the answers were (Table~\ref{tab:close}). In the gold condition there are 494 of them. Three out of five have an F1 of at least 0.5, in about half one of the two answers contains the other (an extra or a missing word), and only one in five has no word in common with the reference. Dropping the danda would rescue under 1\% of them, so the danda is not the problem. The other conditions show the same split.
+
+\begin{table}[H]
+	\centering
+	\caption{Answerable questions where the right passage was retrieved but exact match was 0: how close the answer is (\% of these questions).}
+	\label{tab:close}
+	\small
+	\begin{tabular}{lrrrrrr}
+		\toprule
+		Condition & $n$ & F1 $\ge 0.8$ & F1 $\ge 0.5$ & F1 $= 0$ & One contains other & Empty \\
+		\midrule
+		Gold passage & 494 & 24.3 & 60.1 & 20.4 & 52.8 & 5.5 \\
+		BM25 & 419 & 24.1 & 60.6 & 19.8 & 55.1 & 4.5 \\
+		Hybrid & 405 & 25.2 & 62.0 & 18.8 & 55.3 & 4.0 \\
+		Dense & 376 & 25.8 & 63.8 & 18.6 & 55.6 & 4.5 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+Table~\ref{tab:examples} lists some of these failures from the gold condition. They are the first failures in the output file whose reference and prediction are short; the six that are left out are long sentences or look much like the ones shown, and none was dropped for being too good or too bad. Most of the short ones differ by a word or a suffix, for example a unit that is missing, a descriptor that is added, or a verb ending (\bn{হিলকে} against \bn{হিল}). Two are wrong (\bn{নয়টি} against \bn{সাতটি}, and the unrelated phrase for \bn{ইসরাইল}).
+
+\begin{table}[H]
+	\centering
+	\caption{Examples of exact-match failures with the correct passage (gold condition).}
+	\label{tab:examples}
+	\small
+	\renewcommand{\arraystretch}{1.25}
+	{\linespread{1.0}\selectfont
+	\begin{tabular}{llp{4.6cm}p{5.4cm}r}
+		\toprule
+		Type & & Reference & Prediction & F1 \\
+		\midrule
+		factoid & & \bn{২-৩ সেন্টিমিটার} & \bn{২-৩} & 0.67 \\
+		factoid & & \bn{খুব অল্প} & \bn{খুব অল্প পরিমাণেই জানা গেছে} & 0.57 \\
+		factoid & & \bn{মধুমালা চট্টোপাধ্যায়} & \bn{বাঙালি নৃতত্ত্ববিদ মধুমালা চট্টোপাধ্যায়} & 0.67 \\
+		factoid & & \bn{বৃটেনের রোল্যান্ড হিল} & \bn{রোল্যান্ড হিলকে} & 0.40 \\
+		factoid & & \bn{পাওয়ারপিসি} & \bn{পাওয়ারপিসি প্ল্যাটফর্মের} & 0.67 \\
+		list & & \bn{হাইফা বন্দর; আশদোদ বন্দর; ইয়ালাত বন্দর} & \bn{হাইফা বন্দর; আশদোদ বন্দর ; ইয়ালাত} & 0.89 \\
+		factoid & & \bn{নয়টি} & \bn{সাতটি} & 0.00 \\
+		factoid & & \bn{ইসরাইল} & \bn{হাইফা শহরের কেন্দ্রস্থল উপকূলে উত্তরে ভূমধ্যসাগরের দক্ষিণে} & 0.00 \\
+		\bottomrule
+	\end{tabular}}
+\end{table}
+
+\section{Error Analysis by Hand}
+\label{sec:errors}
+
+The counts above come from the program. To see the causes, I labelled 40 wrong answers from the gold condition and 40 from BM25, drawn at random from the answerable questions with exact match 0 (Table~\ref{tab:causes}). Table~\ref{tab:errors} gives the result.
+
+\begin{table}[H]
+	\centering
+	\caption{Causes of 40 sampled wrong answers per condition, labelled by hand. The last two rows give the share judged acceptable, with a 95\% Wilson interval.}
+	\label{tab:errors}
+	\small
+	\IfFileExists{tables/error_causes.tex}{\input{tables/error_causes.tex}}{\todo{run scripts/summarize\_errors.py on the labelled error\_sample.csv to create tables/error\_causes.tex}}
+\end{table}
+
+\todo{Write two or three sentences on Table~\ref{tab:errors}: what share of the gold errors is only wording, how the BM25 sample differs (retrieval misses), and which wrong answers were the most common kind.}
+
+\section{The Demonstration Page}
+\label{sec:demo}
+
+Figure~\ref{fig:demo} shows the web page. The user types a question, chooses a retrieval method and presses the answer button. The right-hand side shows the passage that was given to the model, and a table lists the three best passages.
+
+\begin{figure}[H]
+	\centering
+	\IfFileExists{figures/demo_screenshot.png}{\includegraphics[width=\textwidth]{figures/demo_screenshot.png}}{\todo{add a screenshot of the demonstration page as figures/demo\_screenshot.png: one answerable and one unanswerable question}}
+	\caption{The demonstration interface.}
+	\label{fig:demo}
+\end{figure}
 
 \section{Discussion}
+\label{sec:discussion}
 
-\todo{Discuss, in this order: (1) how much accuracy is lost when the passage comes from a retriever instead of being given; (2) which retriever loses least and whether the differences are statistically reliable, using the confidence intervals and the McNemar results; (3) what the NoAns scores do and do not show about abstention; (4) where the remaining errors come from.}
+The question behind the project was how much accuracy is lost when the passage has to be found. With the correct passage the reader reaches an F1 of 77.6 on answerable questions. With BM25 it reaches 71.6, with the hybrid 69.2 and with dense retrieval 63.6. In exact match the losses are 4.1, 6.1 and 10.6 points.
+
+Almost all of that loss comes from retrieval. When the right passage was found, the reader scored the same, about 57\% EM, whichever retriever had found it. When it was not found, the score dropped to about 10\% and half of the answers were empty. Making the reader better would help little on these questions, because the answer is not in front of it. The most useful change is therefore a better first result from the retriever.
+
+Dense retrieval was the worst retriever here, which I did not expect. BGE-M3 is reported to do much better than BM25 on Bengali retrieval benchmarks \cite{chen2024bgem3}. I did not investigate why it does not here. One possibility is that the questions of BanglaRQA were written by looking at a passage, so they share many words with it, and that favours keyword matching. Another is that passages up to 1,024 tokens are summarised into a single vector. Neither idea was tested, and no retriever was tuned. The hybrid did not beat BM25 at rank 1, but it was better at rank 10, so it could matter in a system that passes several passages to the reader.
+
+The model is also weaker at saying that it has no answer than the published one (71.5\% against 85.4\% on unanswerable questions with the correct passage). It was trained only on correct passages, so it has never seen a passage that looks relevant but lacks the answer, and that is the situation a wrong retrieval creates. Table~\ref{tab:hitmiss} shows that in this situation it often writes nothing, which is the safe behaviour, but also that it sometimes gives an answer that is wrong.
+
+Exact match underestimates the model. With the correct passage 56.0\% of answers match exactly, but 82.4\% have an F1 of at least 0.5, and in the examples I looked at most failures were a missing unit, an extra word or a suffix. Because of this I would not read the absolute exact-match figures as the share of questions the system really answers well. The comparison between retrievers does not depend on the choice, since the order and the significance are the same under exact match and under the relaxed match.
+
+\todo{Add one or two sentences from your labelled error sample (Table~\ref{tab:errors}) in your own words: how often a ``wrong'' answer was acceptable to you, and what the real mistakes looked like.}

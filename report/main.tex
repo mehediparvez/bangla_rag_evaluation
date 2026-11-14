@@ -1,4 +1,5 @@
-% Compiles with pdfLaTeX, XeLaTeX or LuaLaTeX. The bibliography uses Biber (Overleaf runs it automatically).
+% !TeX program = xelatex
+% Needs XeLaTeX (Bengali examples). The bibliography uses Biber (Overleaf runs it automatically).
 \documentclass[12pt]{report}
 
 % Font: TeX Gyre Termes is a Times New Roman clone that ships with TeX Live and Overleaf.
@@ -12,6 +13,15 @@
 \else
   \usepackage{fontspec}
   \setmainfont{TeX Gyre Termes}
+  % Bengali text for the examples: Noto Serif Bengali if installed, otherwise FreeSerif.
+  \IfFontExistsTF{Noto Serif Bengali}%
+    {\newfontfamily\bnfont[Script=Bengali]{Noto Serif Bengali}}%
+    {\newfontfamily\bnfont[Script=Bengali]{FreeSerif}}
+\fi
+\ifPDFTeX
+  \newcommand{\bn}[1]{\textit{[Bengali text: compile with XeLaTeX]}}
+\else
+  \newcommand{\bn}[1]{{\bnfont #1}}
 \fi
 
 \usepackage{graphicx}
