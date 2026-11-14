@@ -29,7 +29,7 @@ def pick_examples(data_dir: str, n_answerable: int = 5, n_unanswerable: int = 2,
     rng = random.Random(seed)
     ans = [i["question_raw"] for i in items if i["is_answerable"]]
     unans = [i["question_raw"] for i in items if not i["is_answerable"]]
-    return [[q, "bm25"] for q in rng.sample(ans, n_answerable) + rng.sample(unans, n_unanswerable)]
+    return [[q, METHOD_LABELS["bm25"]] for q in rng.sample(ans, n_answerable) + rng.sample(unans, n_unanswerable)]
 
 
 def build_ui(system: BanglaRAGSystem, examples: list[list[str]]):
