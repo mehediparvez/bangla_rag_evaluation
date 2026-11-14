@@ -144,6 +144,11 @@ def main():
 
     tok = AutoTokenizer.from_pretrained("csebuetnlp/banglat5", use_fast=False)
     model = AutoModelForSeq2SeqLM.from_pretrained("csebuetnlp/banglat5").to(device)
+    # BanglaT5's checkpoint has different shared.weight and lm_head.weight (T5 v1.1 style), but newer
+    # transformers versions default the config to "tied". Record the truth so save_pretrained keeps both
+    # matrices and a reloaded model is not silently re-tied.
+    model.config.tie_word_embeddings = False
+    assert model.lm_head.weight.data_ptr() != model.shared.weight.data_ptr(), "embeddings are tied; refusing to train"
 
     train_items = load_items(args.data_dir, "Train", normalize)
     val_items = load_items(args.data_dir, "Validation", normalize)
