@@ -1,62 +1,158 @@
 \chapter{Methodology}
 
-This chapter describes the data, the RAG pipeline, the metrics and the statistical analysis. All code is in the project repository (\texttt{bangla\_rag/}); each run is repeatable from a fixed random seed.
+\section{Overview}
 
-\section{Research Design}
-
-Every question is answered under four settings that differ only in retrieval: no retrieval (\texttt{none}), BM25 (\texttt{bm25}), dense retrieval with BGE-M3 (\texttt{dense}), and a hybrid of the two (\texttt{hybrid}). The generator model, prompt format, number of retrieved chunks, chunk size and question set are the same in all four. The comparison therefore isolates the effect of the retrieval method. Figure~\ref{fig:pipeline} shows the flow.
+Figure~\ref{fig:pipeline} shows the system. A question goes to a retriever, which selects one passage from a library of 3,000 Bangla Wikipedia passages. The question and the passage are given together to the fine-tuned BanglaT5 model, which writes the answer. The model is trained once and is then used unchanged with every retriever, so any difference between conditions comes from the passage that is supplied.
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\textwidth]{pipeline.png}
-	\caption{The experimental pipeline. Only the retriever changes between settings (RQ1); the same answers are then scored by the RAGAS judge and compared with reference grades (RQ2).}
+	\begin{tikzpicture}[
+		node distance=0.9cm,
+		box/.style={draw, rounded corners, align=center, minimum height=1.0cm, minimum width=2.4cm, font=\small},
+		arr/.style={-{Stealth[length=2.5mm]}, thick}]
+		\node[box] (q) {Question};
+		\node[box, right=of q] (r) {Retriever\\(BM25 / dense / hybrid)};
+		\node[box, right=of r] (p) {Top-1\\passage};
+		\node[box, right=of p] (m) {Fine-tuned\\BanglaT5};
+		\node[box, right=of m] (a) {Answer or\\empty answer};
+		\node[box, below=0.9cm of r] (lib) {Library of 3,000\\passages};
+		\draw[arr] (q) -- (r);
+		\draw[arr] (r) -- (p);
+		\draw[arr] (p) -- (m);
+		\draw[arr] (m) -- (a);
+		\draw[arr] (lib) -- (r);
+		\draw[arr] (q) |- ([yshift=-0.35cm]m.south west) -- (m.south west);
+	\end{tikzpicture}
+	\caption{The question-answering pipeline. The question is used twice: to search the library and as part of the input to the reader.}
 	\label{fig:pipeline}
 \end{figure}
 
-\section{Data}
-\label{sec:domain}
+\section{Dataset}
 
-\textbf{Dataset.} The study uses BanglaRQA \cite{ekram2022banglarqa}, a Bangla reading-comprehension dataset of Wikipedia passages with questions and reference answers. It is released under CC BY-NC-SA 4.0, so it is downloaded at run time rather than redistributed with the code.
+\subsection{BanglaRQA}
 
-\textbf{Retrieval corpus.} All 3,000 passages from the training, validation and test splits form the retrieval pool, so retrieval must find the relevant passage among many distractors.
+The system uses BanglaRQA \cite{ekram2022banglarqa}, released under the CC BY-NC-SA 4.0 licence. The dataset is downloaded at run time and is not included with the code. Each of its 3,000 Wikipedia passages comes with several questions. A question has a type (factoid, causal, confirmation or list), a flag saying whether it can be answered from the passage, and one or two reference answers. Answers are single spans, multiple spans separated by semicolons, or yes/no.
 
-\textbf{Questions.} Questions are drawn from the test split, keeping only answerable questions (1,124 of 1,493), and a seeded random sample of 200 is used (seed 13).
+The authors' official split is used without change (Table~\ref{tab:split}). The splits are made by passage, so no passage appears in more than one of them.
 
-\textbf{Domain.} BanglaRQA is a general-domain dataset built from Wikipedia. Results therefore describe Wikipedia-style questions and should not be assumed to carry over to specialised text such as medical material. This is listed as a limitation in Chapter~5.
+\begin{table}[H]
+	\centering
+	\caption{BanglaRQA splits used in this project.}
+	\label{tab:split}
+	\begin{tabular}{lrrr}
+		\toprule
+		Split & Passages & Questions & Unanswerable \\
+		\midrule
+		Train & 2,400 & 11,912 & \todo{count} \\
+		Validation & 300 & 1,484 & \todo{count} \\
+		Test & 300 & 1,493 & 369 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
-\section{Chunking}
+\subsection{Preprocessing}
 
-Passages are split into windows of 512 characters with 10\% overlap. Window ends snap to whitespace or a sentence mark when one occurs in the last 30\% of the window, to avoid cutting words. This gives 10,898 chunks. Each chunk keeps the identifier of its source passage so retrieval can be checked against the gold passage.
+All text (question, passage and answer) is normalised with the \texttt{normalizer} package released by the BanglaT5 authors, as its documentation requires. The target for training is the first reference answer. For an unanswerable question the target is the empty string. When a question has several answers, only the first is used for training and for scoring, which is what the dataset authors do.
 
-\section{Retrievers}
+The median training input (question plus passage) has 293 tokens under the BanglaT5 tokenizer. The input limit is 1,024 tokens, and only 10 of the 11,912 training questions reach that limit and are truncated.
 
-\begin{itemize}
-	\item \textbf{BM25.} Okapi BM25 over whitespace tokens after normalisation (Unicode NFC, Bangla digits mapped to ASCII, punctuation removed).
-	\item \textbf{Dense.} BAAI/bge-m3 embeddings, cosine similarity, searched with a FAISS inner-product index.
-	\item \textbf{Hybrid.} Reciprocal rank fusion ($k=60$) of the top 50 results of BM25 and dense retrieval.
-\end{itemize}
-All retrieval settings return the top 3 chunks.
+\section{The Reader: Fine-Tuned BanglaT5}
 
-\section{Generation}
+\subsection{Model}
 
-The generator is Google's Gemini (model identifier \texttt{gemini-3.5-flash-lite}) at temperature 0 and a 512-token output limit, accessed through the free API tier. One fixed Bangla prompt is used: with retrieval, the model is told to answer using only the given passages and to reply ``no answer in the passages'' if they do not contain it; without retrieval it answers from its own knowledge. The model returns JSON with an answer and a short explanation. Every call is cached on disk, so a run can be resumed and repeated without new calls.
+The reader is BanglaT5 (\texttt{csebuetnlp/banglat5}) \cite{bhattacharjee2023banglat5}, an encoder-decoder Transformer with 12 encoder and 12 decoder layers and about 247 million parameters, built on the T5 architecture \cite{raffel2020t5}. The encoder reads the question and the passage together. The decoder writes the answer one token at a time.
 
-\section{Metrics}
+\subsection{Input and Output Format}
 
-\textbf{Answer accuracy.} Exact match (EM) and token-level F1 against the reference answers (the maximum over references). Text is normalised before comparison, and an answer counts as \emph{correct} when F1 $\ge 0.5$; this binary outcome is used for the significance tests.
+The question and the passage are given to the tokenizer as a pair, question first, with the passage truncated if the pair exceeds 1,024 tokens. The target is the first normalised reference answer, at most 256 tokens. An unanswerable question has an empty target, so the model learns to produce nothing when the passage has no answer. This format follows the dataset authors' published training code \cite{ekram2022banglarqa}.
 
-\textbf{Retrieval quality.} \emph{Passage hit@k}: at least one retrieved chunk comes from the gold passage. \emph{Answer in context}: a reference answer appears as text in the retrieved chunks. The second metric shows an upper bound on what the generator can use.
+\subsection{Training}
 
-\section{Statistical Analysis}
+The model is trained with the standard cross-entropy loss over the answer tokens. Batches are grouped by length so that short inputs are not padded to the length of long ones, which saves computation. Weights are kept in 32-bit precision and the forward pass runs in bfloat16, because T5-family models are known to overflow in 16-bit floating point. Table~\ref{tab:train-config} lists the settings.
 
-Means are reported with 95\% bootstrap confidence intervals over questions. Settings are compared on the same questions with the exact McNemar test on the binary correct outcome, with Holm correction for multiple comparisons. For RQ2, RAGAS faithfulness is treated as a detector of unsupported answers: an answer is unsupported if its reference faithfulness grade is below 3 (or it is a synthetic row). We report the area under the ROC curve (AUC) with a bootstrap confidence interval, the false-alarm rate (supported answers that RAGAS scores below 0.5) and the detection rate (unsupported answers scored below 0.5). Spearman's rank correlation with a bootstrap confidence interval is reported as well, but it is inflated by the deliberately varied sample and is not the headline result.
+\begin{table}[H]
+	\centering
+	\caption{Training configuration. \todo{Confirm after the final run.}}
+	\label{tab:train-config}
+	\begin{tabular}{ll}
+		\toprule
+		Setting & Value \\
+		\midrule
+		Optimizer & AdamW, no weight decay \\
+		Learning rate & $1\times10^{-4}$, 5\% linear warmup then linear decay \\
+		Batch size & 8, with 2 accumulation steps (effective 16) \\
+		Gradient clipping & 1.0 \\
+		Epochs & 10 \\
+		Precision & bfloat16 forward pass, fp32 weights \\
+		Maximum input / target length & 1,024 / 256 tokens \\
+		Random seed & 13 \\
+		Hardware & one NVIDIA L4 GPU (Google Colab) \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
-\section{RQ2: Human Grading and RAGAS}\label{sec:method-rq2}
+After every epoch the model is evaluated on the validation set, and the checkpoint with the best validation F1 is kept. The test set is not used for any choice. The dataset authors trained for 15 epochs with a batch size of 2 and a learning rate of $5\times10^{-5}$; this project uses a larger batch and a higher learning rate to shorten training, and checks the result against their published scores.
 
-\textbf{Rows graded.} In a random sample of retrieval-based answers almost every answer is faithful, so a correlation between RAGAS and a grade has almost nothing to measure (a ceiling effect; a first sample of 100 answers had 98 faithfulness grades of 3). The graded set therefore has 290 answers of four kinds: 100 randomly drawn answers from the BM25 and hybrid settings; 100 more, half of them drawn from answers that were likely to be bad (the reference answer is missing from the retrieved text, or F1 is below 0.5); 60 closed-book answers (produced without retrieval) shown with the passages that retrieval found for the same question, many of which are unsupported; and 30 synthetic unsupported answers, each an answer paired with the passages retrieved for a different question. The synthetic rows are unsupported by construction and are identified in a separate key file that is not shown during grading.
+\section{Retrieval}
 
-\textbf{Grading scale.} Each answer is graded on two 1--3 scales from the passages shown only, not from the grader's own knowledge: faithfulness (is every claim in the answer supported by the passages; 1 = mostly unsupported, 2 = partly supported, 3 = fully supported) and relevance (does the answer address the question; 1 = off-topic or a refusal, 2 = partly, 3 = directly). An answer of the form ``the passages do not contain the answer'' is graded faithful 3 and relevant 1.
+\textbf{Library.} The library contains the 3,000 passages from all three splits, each kept whole with its identifier. Searching all of them, not only the test passages, makes retrieval harder and closer to real use. \todo{Confirm after the retrieval code is finished and tested.}
 
-\textbf{Reference grades.} The grades were drafted with a large language model (Claude), which judged only from the passages shown, and were reviewed and finalised by the author. They are model-assisted labels, so no agreement statistic between raters is reported (Chapter~5).
+\textbf{BM25.} Text is lower-cased, punctuation including the Bangla danda is removed, and the result is split on whitespace. No stemmer or stop-word list is used. BM25 \cite{robertson2009bm25} is applied with its default parameters.
 
-\textbf{RAGAS.} RAGAS (version 0.2.x) computes faithfulness and answer relevancy for the same answers, using Gemini as the judge model. The judge prompts are run in English, and in an experimental Bangla-adapted version, to test whether prompt language matters. Because the judge and the generator are both Gemini models, the judge may favour the generator's style; this is acknowledged as a limitation.
+\textbf{Dense retrieval.} The passages and the question are embedded with BGE-M3 \cite{chen2024bgem3}. Vectors are normalised, so the inner product equals the cosine similarity, and an exact (non-approximate) FAISS index \cite{johnson2019faiss} returns the nearest passages.
+
+\textbf{Hybrid retrieval.} The BM25 and dense rankings are merged by reciprocal rank fusion \cite{cormack2009rrf}:
+\begin{equation}
+	\mathrm{RRF}(d) = \sum_{r \in \{\text{BM25},\ \text{dense}\}} \frac{1}{k + \mathrm{rank}_r(d)}, \qquad k = 60,
+\end{equation}
+where $\mathrm{rank}_r(d)$ is the position of passage $d$ in ranking $r$.
+
+In every retrieval condition the reader receives the single top-ranked passage. The match rate of the retriever is also reported on its own: hit@$n$ is the share of questions for which the question's own passage is among the top $n$ results ($n = 1$ and $n = 3$).
+
+\section{Evaluation}
+
+\subsection{Conditions}
+
+The same trained checkpoint is run on all 1,493 test questions under four conditions (Table~\ref{tab:conditions}). The first is an upper bound, and the others show how much is lost when the passage has to be found.
+
+\begin{table}[H]
+	\centering
+	\caption{Evaluation conditions.}
+	\label{tab:conditions}
+	\begin{tabular}{ll}
+		\toprule
+		Condition & Passage given to the reader \\
+		\midrule
+		Gold & the question's own passage \\
+		BM25 & top-1 passage from BM25 \\
+		Dense & top-1 passage from BGE-M3 \\
+		Hybrid & top-1 passage from reciprocal rank fusion \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{Metrics}
+
+Scoring follows the dataset authors' evaluation code so that results can be compared with theirs. Answers are lower-cased, ASCII punctuation is removed and whitespace is collapsed. \textbf{Exact match (EM)} is 1 if the prediction equals the reference after this normalisation and 0 otherwise. \textbf{F1} is the harmonic mean of token-level precision $P$ and recall $R$,
+\begin{equation}
+	F_1 = \frac{2PR}{P + R},
+\end{equation}
+computed over whitespace-separated tokens. For answers with several spans, the spans are matched one-to-one to the reference spans by an assignment that maximises F1, and the score is averaged over the larger of the two span counts, so a missing span or an extra span lowers the score. For an unanswerable question the prediction is correct only if it is also empty.
+
+Because retrieval can change the passage but not the question, results are reported separately for answerable questions (HasAns) and unanswerable questions (NoAns). The NoAns score has to be read with care: when retrieval returns a wrong passage, a model that answers nothing is still counted correct on an unanswerable question. HasAns EM and F1 are therefore the primary measures for comparing retrievers. The rate at which the model gives an empty answer to an answerable question is also reported.
+
+\subsection{Statistical Analysis}
+
+All conditions are evaluated on the same questions, so comparisons are paired. For exact match, two conditions are compared with McNemar's test, using the mid-$p$ version \cite{fagerland2013mcnemar}. With $b$ questions that only the first condition answers correctly and $c$ that only the second does, the two-sided mid-$p$ value is
+\begin{equation}
+	p = 2\sum_{i=0}^{m} \binom{b+c}{i}\,2^{-(b+c)} - \binom{b+c}{m}\,2^{-(b+c)}, \qquad m = \min(b, c).
+\end{equation}
+Confidence intervals for EM, F1 and for differences between conditions come from a paired bootstrap with 10,000 resamples \cite{efron1979bootstrap, berg2012empirical}. Because about five test questions share a passage, whole passages are resampled together and not single questions. The three comparisons between retrievers (BM25 against dense, BM25 against hybrid, dense against hybrid) are corrected with the Holm procedure \cite{holm1979simple}. General guidance on significance testing in NLP \cite{dror2018hitchhiker} informed these choices.
+
+\subsection{Sanity Check Against Published Results}
+
+The gold condition is compared with the dataset authors' published test scores (EM 62.42, F1 78.11). A result close to these confirms that the training and scoring code are correct before the retrieval results are interpreted. Retrieval conditions have no published baseline.
+
+\subsection{Error Analysis}
+
+Wrong answers from the gold condition and from the best retrieval condition are sampled and assigned to a cause: retrieval miss (the correct passage was not returned), reader error (the passage was right but the answer wrong), or a surface mismatch (the answer is right in meaning but differs in wording, spelling or punctuation). Retrieval misses are identified automatically from passage identifiers. The other labels are assigned by hand by the author.

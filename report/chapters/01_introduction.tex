@@ -1,42 +1,53 @@
 \chapter{Introduction}
 
-\section{Contextual Background}
+\section{Background}
 
-Large language models (LLMs) now answer questions fluently in many languages, including Bangla. They still have three weaknesses that matter in practice. They do not know documents they were never trained on, such as a university's textbooks or a hospital's guidelines. They sometimes state wrong answers with confidence. And they cannot show where an answer came from. Retrieval-augmented generation (RAG) addresses these problems: the system first searches a document collection, then gives the best passages to the model and asks it to answer from them.
+A question-answering (QA) system takes a question in natural language and returns an answer. For Bangla, a language with more than 200 million speakers, such systems are still much less developed than for English. Two things limit them. There are few large, well-annotated Bangla QA datasets, and the language models available for Bangla are small compared with the models used in English-language work.
 
-Most evidence on how to build RAG systems comes from English. Bangla differs from English in ways that can change which design choices work. Words take many inflected forms, which affects keyword matching. Embedding models trained mostly on English text may represent Bangla less well. Published work comparing retrieval choices for Bangla RAG is sparse (Chapter~2).
+A small language model has a further problem: it cannot store many facts. If it is asked about a person, a place or an event that it saw rarely or never during training, it either gives a wrong answer or makes one up. Making the model larger helps but is expensive, and the facts inside a model cannot be updated without training it again.
 
-A second problem is evaluation. Grading thousands of answers by hand is slow, so researchers use automatic judges. RAGAS is a widely used open-source framework that asks an LLM to judge whether an answer is supported by the retrieved passages and whether it addresses the question \cite{es2023ragas}. It was validated against human annotation on a small English set. Whether its scores agree with human judgement on Bangla answers is not established.
+Retrieval-augmented generation (RAG) avoids both problems \cite{lewis2020rag}. The facts are kept in a separate document collection. When a question arrives, a retriever searches the collection and passes the best passage to the model together with the question. The model's job is then to read the passage and write the answer. The collection can be changed at any time without touching the model, and the passage that was used can be shown to the user as the source of the answer.
 
 \section{Motivation}
 
-Even strong frontier models benefit from retrieval when the answer lies in documents they have not seen, and RAG remains the standard way to ground answers in a specific source. Teams building Bangla question-answering systems must still choose a retrieval method, and they need a way to measure answer quality without grading every answer manually. This project provides a controlled comparison of three retrieval methods against a no-retrieval baseline, and a first check of how far RAGAS can be trusted on Bangla.
+This project asks what a Bangla RAG system built from open, small components can do. Three practical questions motivate it.
 
-A no-retrieval baseline is essential here. If the generator already answers most questions correctly without any retrieved text, retrieval adds little on that kind of question, and that is itself a finding.
+First, the model has to learn the skill of answering from a passage. BanglaT5 \cite{bhattacharjee2023banglat5} is pretrained on Bangla text but has no question-answering ability of its own, so it must be fine-tuned. Second, the retriever has to find the right passage before the model can use it. Keyword search and meaning-based search can behave differently on Bangla, because Bangla words appear in many inflected forms and embedding models are often trained mostly on other languages. Third, the system has to know when the collection does not contain the answer. A system that always produces an answer is less useful than one that says it cannot answer.
 
-\section{Research Questions and Objectives}
+\section{Problem Statement}
 
-\begin{description}[leftmargin=0cm,labelindent=0cm]
-	\item[RQ1] How does retrieval method (none, BM25, dense, hybrid) affect the accuracy of Gemini's Bangla answers, and which setting performs best?
-	\item[RQ2] Do automatic RAGAS scores (faithfulness and answer relevancy) agree with human grades of the same Bangla answers?
-\end{description}
+Given a Bangla question and a collection of Bangla passages, the system must return the answer if the collection contains it and an empty answer if it does not. Existing work on the BanglaRQA dataset \cite{ekram2022banglarqa} measures how well a fine-tuned model reads a passage that is already known to be the correct one. In a real system the passage has to be found first, and an error in retrieval becomes an error in the answer. It is not known from the published results how much accuracy is lost at this step for Bangla, nor which retrieval method loses the least.
 
-The objectives are to:
+\section{Objectives}
+
+The objectives of this project are to:
 \begin{enumerate}
-	\item build a reproducible pipeline that runs every setting on the same questions with one fixed prompt and generator;
-	\item measure answer accuracy and retrieval quality for each setting, with confidence intervals and paired significance tests;
-	\item collect human grades for a sample of answers and measure their agreement with RAGAS;
-	\item state clearly what the results do and do not show.
+	\item fine-tune BanglaT5 on BanglaRQA so that it answers a question from a given passage, and answers with an empty string when the passage does not contain the answer;
+	\item build a retrieval component over the 3,000 BanglaRQA passages with three methods: BM25, dense retrieval and a hybrid of the two;
+	\item combine retrieval and the fine-tuned model into one question-answering pipeline;
+	\item evaluate the pipeline on the held-out test questions with the metrics used by the dataset authors, and compare the three retrieval methods against each other and against the case where the correct passage is supplied;
+	\item analyse where the remaining errors come from.
 \end{enumerate}
 
-\section{Scope and Contributions}
+\section{Scope and Limitations of the Study}
 
-This is an empirical study, not a new method. The contributions are a documented and reproducible comparison of retrieval settings on a Bangla QA dataset, and, as far as web searches for this project could determine (no earlier study turned up), a first comparison of RAGAS scores with human grades on Bangla RAG answers. The code is released with the report.
+The knowledge base is the Wikipedia passages of BanglaRQA, so the system answers questions about the topics in that collection and not about arbitrary subjects. Only one model (BanglaT5, about 247 million parameters) is fine-tuned, once, and only one embedding model (BGE-M3) is used for dense retrieval. The retrievers are used as published and are not trained. The study does not include a comparison with large commercial language models. These choices keep the study small enough to repeat on a single GPU, and they define what the results can and cannot show.
+
+\section{Functionality of the Proposed System}
+
+A user types a Bangla question. The system searches the passage collection and selects the best-matching passage. It then gives the question and that passage to the fine-tuned BanglaT5 model, which writes a short answer. If the model judges that the passage does not contain the answer, it returns an empty answer. The passage is returned with the answer so that the user can check it.
+
+\section{Contributions}
+
+The contributions are:
+\begin{itemize}
+	\item a fine-tuned BanglaT5 question-answering model trained on BanglaRQA, with its training procedure documented;
+	\item a retrieval-augmented pipeline for Bangla with three interchangeable retrievers;
+	\item a controlled comparison of the three retrievers, measured both by how often they find the correct passage and by the accuracy of the final answers, with confidence intervals and paired significance tests;
+	\item an analysis of how often an unanswerable question is handled correctly, and how much of the score on those questions depends on retrieval;
+	\item an error analysis that separates retrieval failures from reading failures.
+\end{itemize}
 
 \section{Report Organization}
 
-\textbf{Chapter 1: Introduction} gives the background, research questions and scope.
-\textbf{Chapter 2: Literature Review} covers retrieval methods, Bangla RAG work and LLM-based evaluation.
-\textbf{Chapter 3: Methodology} describes the data, pipeline, metrics and statistics.
-\textbf{Chapter 4: Results} reports the experiments.
-\textbf{Chapter 5: Conclusion} summarises findings, limitations and future work.
+Chapter~2 reviews related work on Bangla QA, BanglaT5, retrieval-augmented generation and retrieval methods. Chapter~3 describes the dataset, the system and the evaluation. Chapter~4 reports the training results and the evaluation results, and discusses them. Chapter~5 concludes and lists limitations and future work.

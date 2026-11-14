@@ -1,36 +1,37 @@
 \chapter{Literature Review}
 
-This chapter reviews three areas: retrieval methods used in RAG, existing Bangla RAG and question-answering work, and the validation of LLM-based evaluators, including RAGAS. It ends with the gap this project addresses.
+\section{Question Answering in Bangla}
 
-\section{Retrieval Methods for RAG}
+BanglaRQA \cite{ekram2022banglarqa} is a reading-comprehension dataset built from Bangla Wikipedia. It contains 3,000 passages and 14,889 questions, of which 3,631 are unanswerable. The questions are of four types: factoid, causal, confirmation (yes/no) and list. Answers are single spans, multiple spans or yes/no. The authors fine-tuned several models on it, among them BanglaT5, and reported results for the case where the correct passage is given to the model. Their BanglaT5 reached an exact match of 62.42 and an F1 of 78.11 on the test set. These numbers are the reference point for the reading component of this project.
 
-\textbf{Keyword retrieval.} BM25 ranks passages by how often the query terms appear in them, adjusted for passage length and term rarity \cite{robertson2009bm25}. It needs no training and is a strong baseline, but it depends on how text is split into words. This matters for Bangla, where inflection and the way characters combine can split or merge tokens. This project tokenises on whitespace after removing punctuation, rather than on regular-expression word characters, which would split Bangla words at vowel signs.
+Other Bangla QA work has moved toward systems that retrieve text first. BanglaMedQA and BanglaMMedBench \cite{sultana2025banglamedqa} compare several RAG strategies for Bangla biomedical questions using large language models as generators. HybridRAG-BN \cite{aich2026hybridragbn} combines keyword and dense retrieval for question answering over Bangla Wikipedia, again with a large language model as the generator. Both use general-purpose large models as the answering component, not a small model fine-tuned for the task.
 
-\textbf{Dense retrieval.} Dense retrievers map the query and each passage to vectors and rank by similarity. BGE-M3 is a multilingual embedding model that supports long inputs and more than 100 languages \cite{chen2024bgem3}. Multilingual E5 is a comparable model family \cite{wang2024me5}. Sentence encoders tuned for similarity rather than retrieval, such as Bengali SBERT, may behave differently on retrieval tasks. The reviewed sources did not include a Bangla-specific comparison of these models, although indirect evidence from multilingual retrieval benchmarks suggests BGE-M3 and multilingual E5 are broadly comparable.
+\section{Text-to-Text Models and BanglaT5}
 
-\textbf{Hybrid retrieval.} Hybrid methods combine the keyword and dense rankings. Reciprocal rank fusion (RRF) merges ranked lists by summing $1/(k+\text{rank})$ over the lists and needs no score calibration \cite{cormack2009rrf}. This project uses RRF with $k=60$.
+T5 \cite{raffel2020t5} treats every language task as text in, text out. An encoder reads the input and a decoder writes the output, so question answering is the same kind of problem as translation or summarisation. BanglaT5 \cite{bhattacharjee2023banglat5} is a T5 model pretrained on a large Bangla corpus, with about 247 million parameters. It was introduced together with a benchmark of Bangla text-generation tasks. Before fine-tuning it has learned the language but has no specific skill, such as answering questions.
 
-\section{Bangla RAG and Question Answering}
+\section{Retrieval-Augmented Generation}
 
-\textbf{BanglaRQA.} BanglaRQA is a Bangla reading-comprehension dataset built on Wikipedia passages with several question and answer types \cite{ekram2022banglarqa}. It is used here as both the question source and the retrieval corpus.
+Retrieval-augmented generation \cite{lewis2020rag} gives a generator access to an external collection of documents. A retriever selects passages related to the input, and the generator conditions on them. The idea was developed for knowledge-intensive tasks, where the needed facts are too many to be stored in the model's parameters. Dense passage retrieval \cite{karpukhin2020dpr} showed that learned vector representations of questions and passages can retrieve better than keyword methods for open-domain QA in English.
 
-\textbf{BanglaMedQA.} Sultana et al.\ \cite{sultana2025banglamedqa} benchmark RAG strategies on Bangla medical multiple-choice questions, using an OCR-processed higher-secondary Bangla medical textbook as the corpus. They compare strategies (traditional, zero-shot fallback, agentic, iterative-feedback and aggregate RAG) rather than the retrieval components, and report their best accuracy, 89.54\%, with an agentic pipeline. This project instead uses a general-domain dataset (Section~\ref{sec:domain}).
+A common way to train the reading component is to give it the correct passage, as in BanglaRQA. At test time the passage comes from a retriever and may be wrong. A reader trained only on correct passages has never seen a passage that lacks the answer, so its behaviour in that case is not guaranteed. This gap between training and use is one of the things measured here.
 
-\textbf{Other Bangla RAG systems.} Newer preprints describe application-specific Bangla RAG systems. HybridRAG-BN \cite{aich2026hybridragbn} combines BM25 and BGE-M3 retrieval with a cross-encoder reranker and a fine-tuned verification model for Bangla knowledge-base question answering. Judging from the abstracts, such work reports the end-to-end results of one pipeline rather than a controlled comparison of retrieval components or of automatic judges, which is the gap this project addresses. This survey is based on web searches and abstracts, not an exhaustive review.
+\section{Retrieval Methods}
 
-\section{Evaluating Answers with LLM Judges}
+\textbf{BM25} \cite{robertson2009bm25} scores a passage by the query words it contains, giving more weight to words that are rare in the collection and limiting the benefit of repeating a word. It needs no training and is a strong baseline, but it only matches words that appear in the passage in the same form.
 
-\textbf{RAGAS.} The RAGAS framework defines reference-free metrics, including faithfulness (are the answer's claims supported by the retrieved context?) and answer relevancy (does the answer address the question?) \cite{es2023ragas}. In its original paper, agreement with human annotation was measured on a small English set; faithfulness agreed most (0.95), and answer relevance less (0.78).
+\textbf{Dense retrieval} converts the question and every passage into vectors with an embedding model, and returns the passages whose vectors are closest to the question's. BGE-M3 \cite{chen2024bgem3} is a multilingual embedding model that supports Bangla and long inputs. The BGE-M3 paper reports results on MIRACL, a multilingual retrieval benchmark that includes Bengali, in which dense retrieval with the model was clearly better than BM25. \todo{Add the exact MIRACL Bengali figures after reading the table in the BGE-M3 paper.} Vector search over a small collection can be done exactly with a library such as FAISS \cite{johnson2019faiss}.
 
-\textbf{Multilingual validation.} MEMERAG meta-evaluates LLM judges for RAG on five languages (English, German, Spanish, French, Hindi) with expert annotation, and reports only moderate balanced accuracy on faithfulness; Bengali is not covered and all prompts were in English \cite{blandon2025memerag}. The closest direct precedent is work adapting RAGAS to Romanian and validating it against native-speaker annotation \cite{creanga2026romanian}. Beyond RAG, the Pariksha study compared human and LLM evaluators on ten Indic languages including Bengali, and found lower human--LLM agreement on direct assessment for Bengali than the cross-language average (Kendall's $\tau$ of 0.43 against 0.65) \cite{watts2024pariksha}.
+\textbf{Hybrid retrieval} combines the two. Reciprocal rank fusion \cite{cormack2009rrf} ranks each passage by the sum of $1/(k + \text{rank})$ over the individual rankings, with $k = 60$ commonly used. It needs no score calibration between the two retrievers.
 
-\textbf{Limits of the evidence.} Evidence on RAGAS stability comes mostly from practitioner material rather than peer-reviewed studies. No guidance on the human sample size needed to validate a judge was found; the sample size here follows practical constraints and the confidence intervals reported in Chapter~4 show its precision.
+\section{Unanswerable Questions}
+
+SQuAD 2.0 \cite{rajpurkar2018squad2} added questions that cannot be answered from the passage and required systems to abstain on them. It reports results separately for questions with answers and questions without. BanglaRQA follows the same idea, and this report uses the same split when presenting results.
 
 \section{Research Gap}
 
-Together, the reviewed work leaves two gaps that this project addresses on a small scale:
-\begin{enumerate}
-	\item no controlled comparison of no-retrieval, keyword, dense and hybrid retrieval with one fixed generator and prompt on a Bangla QA dataset was found;
-	\item no validation of RAGAS faithfulness and answer-relevancy scores against human grades on Bangla RAG answers was found.
-\end{enumerate}
-Both statements rest on a web-based search and should be read as ``to the best of our knowledge''.
+Published BanglaRQA results measure reading with the correct passage. Published Bangla RAG systems use large language models as the generator. To the best of our knowledge, and based on searches of arXiv, the ACL Anthology and preprint servers up to November 2026, we did not find a study that fine-tunes BanglaT5 as the reader in a Bangla retrieval-augmented pipeline and compares BM25, dense and hybrid retrieval on the accuracy of the final answers. \todo{Read and cite the January 2026 preprint on BanglaRQA with RAG (Preprints.org 202601.1821) and state how this project differs. The search could not rule out other papers.}
+
+\section{Summary}
+
+The reading component is established: BanglaT5 fine-tuned on BanglaRQA with the correct passage reaches about 62 EM and 78 F1. What is open is how the full system performs when the passage comes from a retriever, and which retriever is best for Bangla. The next chapter describes how this project measures that.

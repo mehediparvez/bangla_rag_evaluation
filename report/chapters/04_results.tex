@@ -1,71 +1,133 @@
-\chapter{Results}
+\chapter{Experiments and Results}
 
-\section{Retrieval Quality}
+\section{Introduction}
 
-On the full sample of 200 questions, the passage that contains the answer was among the top three retrieved chunks for 98.0\% of questions with BM25, 96.0\% with dense retrieval and 99.0\% with the hybrid method (Table~\ref{tab:rq1-metrics}). A reference answer appeared verbatim in the retrieved text for only 73--75\% of questions. The gap of more than 20 points between finding the right passage and having the answer string in the retrieved chunks suggests that the 512-character chunking, not passage finding, limits what the generator can use. (Some answers are paraphrases and would not match as an exact string, so the second number is a lower bound on whether the answer was available.)
+This chapter describes the experimental setup and reports the training results, the retrieval results and the end-to-end answer accuracy. Every number marked as a to-do is filled in from the final runs; the numbers in the text must always agree with the tables.
+
+\section{Experimental Setup}
+
+\subsection{Computational Environment}
+
+All training and evaluation ran on Google Colab with one NVIDIA L4 GPU (about 23 GB of memory). Training used the Hugging Face Transformers library with PyTorch. \todo{Add exact versions of Python, PyTorch, Transformers, sentence-transformers, FAISS and rank\_bm25 from the saved config.json.} The code, the training configuration and the per-question predictions are saved so that every number can be recomputed.
+
+\subsection{Implementation Details}
+
+The fine-tuning script reads the BanglaRQA training set, builds the question--passage inputs described in Chapter~3, and trains with the configuration in Table~\ref{tab:train-config}. A short test run of 150 optimizer steps compared bfloat16 with 32-bit precision before the full run: the mean loss was 14.24 in bfloat16 and 14.25 in fp32, with no overflow, and bfloat16 used less memory (14.4 GiB against 17.9 GiB) at the same speed (about 28 examples per second). The full run therefore used bfloat16.
+
+\section{Training Results}
+
+\subsection{Training and Validation Curves}
+
+Figure~\ref{fig:curve} shows the training loss and the validation F1 after each epoch. In the first epoch the model produced an empty answer for every validation question, which scores 24.1\% because that is the share of unanswerable questions; in the second epoch it began answering real questions (validation F1 rose from 0.241 to 0.457, and answerable EM from 0 to 0.224). \todo{Describe the later epochs, where the curve flattens, and which epoch was selected.}
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=0.75\textwidth]{retrieval_gap.png}
-	\caption{Share of questions where the right passage was retrieved, and where the reference answer string appears in the retrieved chunks (200 questions).}
-	\label{fig:retrieval-gap}
+	\IfFileExists{figures/training_curve.png}{\includegraphics[width=0.8\textwidth]{figures/training_curve.png}}{\todo{copy training\_curve.png from the Drive run folder into report/figures/}}
+	\caption{Training loss and validation F1 per epoch.}
+	\label{fig:curve}
 \end{figure}
 
-\section{RQ1: Effect of Retrieval Method on Answer Accuracy}
+\subsection{Selected Checkpoint}
 
-Table~\ref{tab:rq1-metrics} shows the metrics for each setting, and Table~\ref{tab:rq1-mcnemar} shows paired tests against the no-retrieval baseline.
+\todo{State the epoch with the best validation F1 and its validation EM and F1. Training time per epoch was about 7.5 minutes.}
+
+\section{Gold-Passage Results and Comparison with the Published Scores}
 
 \begin{table}[H]
 	\centering
-	\caption{Answer metrics per setting (mean and 95\% bootstrap CI).}
-	\label{tab:rq1-metrics}
-	\IfFileExists{tables/rq1_metrics.tex}{\input{tables/rq1_metrics.tex}}{\todo{run make\_tables.py to create tables/rq1\_metrics.tex}}
+	\caption{Test results with the correct passage supplied, compared with the dataset authors' published BanglaT5 scores.}
+	\label{tab:gold}
+	\begin{tabular}{lcccc}
+		\toprule
+		 & \multicolumn{2}{c}{Overall} & \multicolumn{2}{c}{Answerable} \\
+		System & EM & F1 & EM & F1 \\
+		\midrule
+		Published (Ekram et al.) & 62.42 & 78.11 & 54.89 & 75.73 \\
+		This project & \todo{} & \todo{} & \todo{} & \todo{} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\todo{Discuss the gap to the published scores and what could explain it (fewer optimizer steps, larger batch, higher learning rate, one seed). State whether the sanity check passed.}
+
+\section{Retrieval Results}
+
+\begin{table}[H]
+	\centering
+	\caption{Share of test questions for which the question's own passage is among the top $n$ retrieved passages.}
+	\label{tab:hit}
+	\begin{tabular}{lcc}
+		\toprule
+		Retriever & Hit@1 & Hit@3 \\
+		\midrule
+		BM25 & \todo{} & \todo{} \\
+		Dense (BGE-M3) & \todo{} & \todo{} \\
+		Hybrid (RRF) & \todo{} & \todo{} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\section{End-to-End Answer Accuracy}
+
+\begin{table}[H]
+	\centering
+	\caption{Test results for each condition, with 95\% bootstrap confidence intervals. HasAns: answerable questions ($n=1{,}124$). NoAns: unanswerable questions ($n=369$). Empty rate: share of answerable questions answered with an empty string.}
+	\label{tab:main}
+	\begin{tabular}{lccccc}
+		\toprule
+		Condition & HasAns EM & HasAns F1 & NoAns EM & Empty rate & Overall F1 \\
+		\midrule
+		Gold & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+		BM25 & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Dense & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Hybrid & \todo{} & \todo{} & \todo{} & \todo{} & \todo{} \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
 \begin{table}[H]
 	\centering
-	\caption{Paired McNemar tests against the no-retrieval baseline (correct means F1 $\ge$ 0.5; Holm-adjusted).}
-	\label{tab:rq1-mcnemar}
-	\IfFileExists{tables/rq1_mcnemar.tex}{\input{tables/rq1_mcnemar.tex}}{\todo{run make\_tables.py to create tables/rq1\_mcnemar.tex}}
+	\caption{Paired comparisons of exact match between retrievers (mid-$p$ McNemar, Holm-adjusted).}
+	\label{tab:mcnemar}
+	\begin{tabular}{lcccc}
+		\toprule
+		Comparison & Only first correct & Only second correct & Adjusted $p$ & EM difference \\
+		\midrule
+		BM25 vs dense & \todo{} & \todo{} & \todo{} & \todo{} \\
+		BM25 vs hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Dense vs hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
+		\bottomrule
+	\end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{table}[H]
 	\centering
-	\includegraphics[width=0.75\textwidth]{rq1_correct.png}
-	\caption{Share of correct answers (F1 $\ge$ 0.5) per setting, with 95\% bootstrap confidence intervals (200 questions).}
-	\label{fig:rq1-correct}
-\end{figure}
+	\caption{HasAns results split by whether retrieval returned the correct passage.}
+	\label{tab:hitmiss}
+	\begin{tabular}{lcccc}
+		\toprule
+		 & \multicolumn{2}{c}{Correct passage retrieved} & \multicolumn{2}{c}{Wrong passage retrieved} \\
+		Retriever & $n$ & EM & $n$ & EM \\
+		\midrule
+		BM25 & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Dense & \todo{} & \todo{} & \todo{} & \todo{} \\
+		Hybrid & \todo{} & \todo{} & \todo{} & \todo{} \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
-Retrieval helps a great deal. With no retrieval, only 28.0\% of answers were correct (F1 $\ge$ 0.5; 95\% CI 22.0--34.5) and exact match was 15.0\%. All three retrieval settings reach 83--86\% correct, a gain of 55 to 57.5 percentage points over the baseline. The paired tests agree: against the no-retrieval baseline, BM25 fixed 111 questions and broke 1, dense retrieval fixed 117 and broke 2, and the hybrid method fixed 113 and broke 1 (all Holm-adjusted $p < 0.0001$).
+\section{Breakdown by Question Type}
 
-The three retrievers cannot be separated on this sample. Their correct rates are 83.0\% (BM25), 85.5\% (dense) and 84.0\% (hybrid) with overlapping confidence intervals (for example 77.5--88.0 for BM25 and 80.0--90.0 for dense). Against the dense default, BM25 was better on 6 questions and worse on 11 (difference $-2.5$ points, Holm-adjusted $p = 0.66$), and the hybrid method was better on 5 and worse on 8 ($p = 0.66$). The hybrid method had the highest passage hit rate (99.0\%) and the highest exact match (44.0\%), but these differences are within the confidence intervals. With 200 questions the study can detect a large effect such as retrieval versus none, but not a difference of a few points between retrievers, so the honest conclusion is that no retriever is shown to be better than another.
+\todo{Table of EM and F1 for factoid, causal, confirmation and list questions, and for single-span, multiple-span and yes/no answers, for the gold condition at least.}
 
-\section{RQ2: RAGAS Compared with Human Grades}
+\section{Error Analysis}
 
-\textbf{Random answers have no variance to measure.} On the first 100 randomly sampled answers, 98 faithfulness grades were 3, and RAGAS faithfulness showed no correlation with them ($\rho \approx 0$, with a very narrow interval, which is what a ceiling effect looks like). Answer relevance was similarly uninformative. This is why the graded set was extended with likely-bad, closed-book and synthetic unsupported answers (Section~\ref{sec:method-rq2}).
+\todo{Table of error causes (retrieval miss, reader error, surface mismatch) for the sampled wrong answers, with two or three example questions in Bangla and the model's answers.}
 
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.75\textwidth]{grade_mix.png}
-	\caption{Distribution of the reference grades on the 290 graded answers. Most answers are fully faithful and relevant, which is why the graded set was enriched with unsupported answers.}
-	\label{fig:grade-mix}
-\end{figure}
+\section{Sample Input and Output}
 
-\textbf{Detection of unsupported answers.} On the final 290 graded answers (220 supported, 69 unsupported, one without a score), RAGAS faithfulness with English judge prompts and Gemini as judge ranks unsupported answers below supported ones with an AUC of 0.909 (95\% CI 0.866--0.944). Using a threshold of 0.5, it flags 89.9\% of unsupported answers, but also 9.1\% of supported answers. The AUC is 0.955 on the 30 synthetic rows and 0.875 on the 39 natural unsupported rows (closed-book and low-F1 answers); the natural figure is the fairer estimate of performance on real RAG output. Supported answers had a mean faithfulness of 0.907.
-
-\textbf{Correlation.} Spearman's $\rho$ between RAGAS faithfulness and the faithfulness grade is 0.782 (95\% CI 0.700--0.853, $n = 289$). This is high but should not be read as agreement on ordinary answers: the sample deliberately mixes good and bad answers, which inflates a rank correlation. For answer relevance, $\rho = 0.294$ (0.167--0.398, $n = 285$). Only 13 of 290 answers have a relevance grade below 3, most of them refusals, so this estimate rests on very few informative rows, and RAGAS answer relevancy cannot be recommended as a stand-in for a grade here.
-
-\textbf{Prompt language.} RAGAS can translate its own judge prompts (instructions and few-shot examples) into another language. This automatic step is experimental and failed intermittently with this judge model; for the reported run it succeeded and the translated prompts were checked in the log to be the ones in use. All 290 answers were scored again with the Bengali prompts. Detection AUC was 0.919 (95\% CI 0.878--0.955) against 0.909 (0.866--0.944) with English prompts; 7.3\% against 9.1\% of supported answers were flagged, and 91.2\% against 89.9\% of unsupported answers were detected. The Spearman correlation with the faithfulness grade was 0.807 (0.733--0.874, $n = 288$) against 0.782 (0.700--0.853), and for answer relevancy 0.246 (0.126--0.346) against 0.294 (0.167--0.398). All differences are small and the intervals overlap almost completely. Judge scores also vary from run to run: re-scoring the same 50 answers with identical English prompts moved the AUC from 0.873 to 0.784 in an earlier check. The result is therefore that Bengali judge prompts neither helped nor hurt measurably here; it is not evidence that either language is better.
-
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\textwidth]{rq2_ragas.png}
-	\caption{RAGAS faithfulness and answer relevancy compared with the reference grades, for English and Bengali judge prompts (290 graded answers; error bars are 95\% bootstrap intervals).}
-	\label{fig:rq2}
-\end{figure}
+\todo{Two or three examples: question, retrieved passage, model answer, reference answer. Include one unanswerable question and one retrieval failure.}
 
 \section{Discussion}
 
-For a practitioner, two things follow. First, retrieval is the large effect: any of the three retrievers more than triples the share of correct Bangla answers over asking the model alone, and choosing among BM25, dense and hybrid matters much less than whether the retrieved text actually contains the answer (about a quarter of questions did not have the answer string in the top three chunks even when the right passage was found). Second, an English-prompted RAGAS faithfulness score is a usable screening tool for unsupported Bangla answers, with an AUC around 0.9, but it is not a clean pass/fail test: it flags roughly one in eleven good answers, so flagged answers need a look rather than automatic rejection.
-
-The results are uncertain in several places: the retrievers are not separated, the unsupported examples are few (69, of which 30 are synthetic), and the reference grades are AI-drafted and author-reviewed (Chapter~5).
+\todo{Discuss, in this order: (1) how much accuracy is lost when the passage comes from a retriever instead of being given; (2) which retriever loses least and whether the differences are statistically reliable, using the confidence intervals and the McNemar results; (3) what the NoAns scores do and do not show about abstention; (4) where the remaining errors come from.}

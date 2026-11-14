@@ -2,30 +2,28 @@
 
 \section{Conclusion}
 
-\textbf{RQ1.} Retrieval strongly improves Bangla question answering with a Gemini generator: the share of correct answers rose from 28.0\% (95\% CI 22.0--34.5) with no retrieval to 83.0\% (77.5--88.0) with BM25, 85.5\% (80.0--90.0) with dense BGE-M3 retrieval and 84.0\% (79.0--89.0) with a hybrid of the two. Differences between the three retrievers are within noise on 200 questions (Holm-adjusted $p \ge 0.66$), so the choice of retriever is not shown to matter here. More than 20 points separate finding the right passage (96--99\%) from having the answer string in the retrieved chunks (73--75\%), which points to chunking as the next thing to examine.
-
-\textbf{RQ2.} On a graded set that deliberately includes unsupported answers, RAGAS faithfulness with English judge prompts detects unsupported Bangla answers well (AUC 0.909, 95\% CI 0.866--0.944; 0.875 on the natural unsupported answers alone) at the cost of flagging 9.1\% of supported answers. Its answer relevancy score is not a usable stand-in for a relevance grade here ($\rho = 0.294$, and relevance grades barely vary). On ordinary random answers, which are almost all faithful, no correlation can be measured at all.
+\todo{Write after the results are final. Cover: what was built (a fine-tuned BanglaT5 reader with three retrievers); the gold-passage result against the published 62.42 / 78.11; how much accuracy is lost with retrieved passages; which retriever lost least and whether the difference is reliable; how the model handled unanswerable questions; and the main source of remaining errors.}
 
 \section{Limitations}
 
 \begin{itemize}
-	\item \textbf{Single domain.} The questions and passages come from general-domain Bangla Wikipedia (BanglaRQA), so results may not carry over to specialised text such as medical material.
-	\item \textbf{Possible training exposure.} The generator may have seen Wikipedia text during training; the no-retrieval baseline measures this, but cannot remove it.
-	\item \textbf{One dataset and one generator.} Findings describe this dataset and this model family, not Bangla RAG in general.
-	\item \textbf{Sample size.} With 200 questions, and 290 graded answers of which 69 are unsupported (30 of them synthetic), confidence intervals are wide, so small differences between settings cannot be resolved.
-	\item \textbf{Model-assisted reference grades.} The grades were drafted with a language model (Claude) and reviewed by the author, with no independent human rater, so the RQ2 results are only as good as these labels.
-	\item \textbf{Constructed evaluation set.} The graded set was built to contain unsupported answers (closed-book answers and answers paired with another question's passages). The synthetic rows are the easiest case for a detector, and the correlation computed on this mixture is higher than it would be on ordinary RAG output.
-	\item \textbf{Prompt language.} English and automatically translated Bengali judge prompts were each scored once on all 290 answers and gave similar results. Because judge scores vary between runs and each condition was run only once, small differences between the two cannot be interpreted. No repeated runs or hand-checked translation were done.
-	\item \textbf{One factor at a time.} Retrieval method was varied with chunk size and number of chunks held fixed, so interactions between them are not measured.
-	\item \textbf{Judge and generator from the same family.} Gemini both generates and judges, which may bias the RAGAS scores toward the generator.
-	\item \textbf{Literature search.} The search was web-based; ``no prior study found'' statements should be checked against Google Scholar and Semantic Scholar.
+	\item \textbf{One dataset and domain.} All passages are general-domain Bangla Wikipedia, and the questions were written from those passages. Results may not carry over to other domains, or to questions that were not written with a passage in mind.
+	\item \textbf{One model and one training run.} The reader was fine-tuned once with a single random seed. The confidence intervals reflect the sampling of test questions only, not variation between training runs.
+	\item \textbf{Training on correct passages only.} The model never saw a wrong passage during training, so its behaviour on retrieval misses is not controlled.
+	\item \textbf{Abstention is confounded with retrieval.} A model that answers nothing is correct on unanswerable questions even if the passage it received is wrong, so NoAns scores say little about retrieval quality.
+	\item \textbf{Scoring follows the dataset authors.} Only the first reference answer is used, and the Bangla danda is not removed in scoring, so correct answers with different punctuation are counted wrong.
+	\item \textbf{Correlated test questions.} About five questions come from each passage, so they are not independent. Passage-level resampling accounts for this in the intervals but reduces the effective sample size.
+	\item \textbf{Single annotator.} The error causes were labelled by one person.
+	\item \textbf{Compute.} The recipe was shortened for a single GPU and may be below the best possible score for this model.
 \end{itemize}
 
-\section{Future Research Directions}
+\section{Future Work}
 
 \begin{itemize}
-	\item Repeat the study on a specialised corpus, for example a medical textbook.
-	\item Vary chunk size, number of retrieved chunks and the embedding model, including a Bengali sentence encoder and multilingual E5.
-	\item Add a second, independent judge model, and independent human graders (blind to any model-drafted labels) to measure human--human and human--model agreement.
-	\item Test open-weight generators, to see whether the findings hold outside one commercial model family.
+	\item Train the reader on retrieved passages, including wrong ones labelled as unanswerable, so that it learns to abstain when retrieval fails.
+	\item Retrieve smaller chunks, or several passages, and study how many the reader should receive.
+	\item Add a second embedding model and a re-ranking step, and test other chunk sizes.
+	\item Repeat the study in a specialised domain such as health or education, with a larger document collection.
+	\item Train with several random seeds to measure variation between runs.
+	\item Evaluate the answers with human judges in addition to string-matching metrics.
 \end{itemize}
